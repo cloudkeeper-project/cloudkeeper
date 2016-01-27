@@ -1,0 +1,666 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.svbio.cloudkeeper</groupId>
+    <artifactId>cloudkeeper-parent</artifactId>
+    <version>2.0.0.0-SNAPSHOT</version>
+
+    <name>CloudKeeper Next-Gen Parent POM</name>
+    <packaging>pom</packaging>
+    <url>http://www.lifecodehealth.com</url>
+
+    <scm>
+        <connection>scm:git:file:${project.basedir}</connection>
+        <tag>HEAD</tag>
+        <url>https://github.com/lifecodehealth/cloudkeeper</url>
+    </scm>
+
+    <modules>
+        <module>cloudkeeper-core</module>
+        <module>cloudkeeper-executors</module>
+        <module>cloudkeeper-maven</module>
+        <module>cloudkeeper-file-staging</module>
+        <module>cloudkeeper-s3-staging</module>
+        <module>cloudkeeper-samples</module>
+    </modules>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+        <!-- The versions for Scala and Config should match the versions required by Akka. -->
+        <akka.version>2.4.0</akka.version>
+        <scala.version>2.11.7</scala.version>
+        <typesafe.config.version>1.3.0</typesafe.config.version>
+
+        <asm.version>5.0.4</asm.version>
+        <buildnumber.version>1.2</buildnumber.version>
+
+        <codehaus.findbugs.version>3.0.0</codehaus.findbugs.version>
+        <eclipse.link.version>2.6.0</eclipse.link.version>
+        <javax.mail.version>1.5.2</javax.mail.version>
+        <maven.assembly.version>2.5.5</maven.assembly.version>
+        <maven.build-helper.version>1.8</maven.build-helper.version>
+        <maven.compiler.version>3.3</maven.compiler.version>
+        <maven.dependency.version>2.10</maven.dependency.version>
+        <maven.dependency.tree.version>2.1</maven.dependency.tree.version>
+        <maven.pmd.version>3.0.1</maven.pmd.version>
+        <maven.checkstyle.version>2.11</maven.checkstyle.version>
+        <maven.surefire.version>2.17</maven.surefire.version>
+        <maven.failsafe.version>${maven.surefire.version}</maven.failsafe.version>
+        <maven.plugin.annotations.version>3.3</maven.plugin.annotations.version>
+        <maven.plugin.plugin.version>3.3</maven.plugin.plugin.version>
+        <maven.plugin.testing-harness.version>3.2.0</maven.plugin.testing-harness.version>
+        <maven.project-info-reports.version>2.7</maven.project-info-reports.version>
+        <maven.processor.version>2.2.4</maven.processor.version>
+        <maven.project-info-reports.version>2.7</maven.project-info-reports.version>
+        <maven.javadoc.version>2.10.3</maven.javadoc.version>
+        <maven.jar.version>2.4</maven.jar.version>
+        <maven.resource.version>2.7</maven.resource.version>
+        <maven.shade.version>2.3</maven.shade.version>
+        <maven.site.version>3.3</maven.site.version>
+        <maven.source.version>2.2.1</maven.source.version>
+
+        <jsr305.version>3.0.0</jsr305.version>
+
+        <!-- The version of Maven that Maven plugins link against. This property is used for multiple dependencies.
+             Check carefully when updating. -->
+        <maven.in.plugins.version>3.1.0</maven.in.plugins.version>
+        <!-- The following version is taken from: https://github.com/apache/maven/blob/maven-3.1.0/pom.xml#L51 -->
+        <plexus.utils.in.plugins.version>3.0.10</plexus.utils.in.plugins.version>
+        <!-- The following version is taken from: https://github.com/apache/maven/blob/maven-3.1.0/pom.xml#L53 -->
+        <guava.in.plugins.version>11.0.2</guava.in.plugins.version>
+        <!-- The following version is taken from: https://github.com/apache/maven/blob/maven-3.1.0/pom.xml#L61 -->
+        <aether.in.plugins.version>0.9.0.M2</aether.in.plugins.version>
+
+        <aws.sdk.version>1.8.9</aws.sdk.version>
+
+        <slf4j.version>1.7.13</slf4j.version>
+        <testng.version>6.8.21</testng.version>
+        <mockito.version>1.10.19</mockito.version>
+        <junit.version>4.11</junit.version>
+        <jacoco.version>0.7.5.201505241946</jacoco.version>
+        <!-- Note that aether-transport-http relies on the Apache HTTP client, so imported versions should be
+             compatible. -->
+        <aether.version>1.0.2.v20150114</aether.version>
+        <maven.version>3.2.5</maven.version>
+        <!-- The following version is taken from: https://github.com/apache/maven/blob/maven-3.2.5/pom.xml#L52 -->
+        <plexus.utils.version>3.0.20</plexus.utils.version>
+        <!-- The following version is taken from: https://github.com/apache/maven/blob/maven-3.2.5/pom.xml#L54 -->
+        <guava.version>18.0</guava.version>
+        <apache.commons.compress>1.7</apache.commons.compress>
+
+        <types.version>1.0.1</types.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- CloudKeeper Core Components -->
+            <dependency>
+                <groupId>com.svbio.cloudkeeper.core</groupId>
+                <artifactId>cloudkeeper-api</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.svbio.cloudkeeper.core</groupId>
+                <artifactId>cloudkeeper-asm-repackaged-5.0</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.svbio.cloudkeeper.core</groupId>
+                <artifactId>cloudkeeper-basic</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.svbio.cloudkeeper.core</groupId>
+                <artifactId>cloudkeeper-dsl</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.svbio.cloudkeeper.core</groupId>
+                <artifactId>cloudkeeper-interpreter</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.svbio.cloudkeeper.core</groupId>
+                <artifactId>cloudkeeper-linker</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.svbio.cloudkeeper.core</groupId>
+                <artifactId>cloudkeeper-marshaling</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.svbio.cloudkeeper.core</groupId>
+                <artifactId>cloudkeeper-model</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.svbio.cloudkeeper.core</groupId>
+                <artifactId>cloudkeeper-staging</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.svbio.cloudkeeper.core</groupId>
+                <artifactId>cloudkeeper-testkit</artifactId>
+                <type>test-jar</type>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.svbio.cloudkeeper.executors</groupId>
+                <artifactId>cloudkeeper-executors-testkit</artifactId>
+                <type>test-jar</type>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.svbio.cloudkeeper.executors</groupId>
+                <artifactId>cloudkeeper-drmaa_1.0</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.svbio.cloudkeeper.executors</groupId>
+                <artifactId>cloudkeeper-forking-executor</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.svbio.cloudkeeper</groupId>
+                <artifactId>cloudkeeper-file-staging</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.svbio.cloudkeeper</groupId>
+                <artifactId>cloudkeeper-s3-staging</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.svbio.cloudkeeper.maven</groupId>
+                <artifactId>cloudkeeper-maven-bundle-loader</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.svbio.cloudkeeper.maven</groupId>
+                <artifactId>cloudkeeper-maven-bundles</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.svbio.cloudkeeper.maven</groupId>
+                <artifactId>cloudkeeper-maven-testkit</artifactId>
+                <type>test-jar</type>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>net.florianschoppmann.java</groupId>
+                <artifactId>java-types</artifactId>
+                <version>${types.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>net.florianschoppmann.java</groupId>
+                <artifactId>java-types</artifactId>
+                <type>test-jar</type>
+                <version>${types.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.typesafe.akka</groupId>
+                <artifactId>akka-actor_2.11</artifactId>
+                <version>${akka.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.typesafe.akka</groupId>
+                <artifactId>akka-testkit_2.11</artifactId>
+                <version>${akka.version}</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.scala-lang</groupId>
+                <artifactId>scala-library</artifactId>
+                <version>${scala.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.google.code.findbugs</groupId>
+                <artifactId>jsr305</artifactId>
+                <version>${jsr305.version}</version>
+                <!-- Needed only for annotations -->
+                <optional>true</optional>
+            </dependency>
+
+            <dependency>
+                <groupId>org.testng</groupId>
+                <artifactId>testng</artifactId>
+                <version>${testng.version}</version>
+                <scope>test</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>org.mockito</groupId>
+                <artifactId>mockito-core</artifactId>
+                <version>${mockito.version}</version>
+            </dependency>
+
+            <dependency>
+                <!-- We use TestNG by default, but there are cases where JUnit is unavoidable; for instance, when
+                     extending third-party tests. -->
+                <groupId>junit</groupId>
+                <artifactId>junit</artifactId>
+                <version>${junit.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-api</artifactId>
+                <version>${slf4j.version}</version>
+            </dependency>
+            <!-- slf4j simple for tests -->
+            <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-simple</artifactId>
+                <version>${slf4j.version}</version>
+            </dependency>
+
+            <!-- BEGIN Maven Plugins: The following dependencies are needed for developing and testing custom Maven
+                 plugins -->
+            <dependency>
+                <groupId>org.apache.maven.plugin-tools</groupId>
+                <artifactId>maven-plugin-annotations</artifactId>
+                <version>${maven.plugin.annotations.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.maven</groupId>
+                <artifactId>maven-core</artifactId>
+                <version>${maven.in.plugins.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.maven</groupId>
+                <artifactId>maven-artifact</artifactId>
+                <version>${maven.in.plugins.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.maven</groupId>
+                <artifactId>maven-plugin-api</artifactId>
+                <version>${maven.in.plugins.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.maven.plugin-testing</groupId>
+                <artifactId>maven-plugin-testing-harness</artifactId>
+                <version>${maven.in.plugins.version}</version>
+            </dependency>
+            <dependency>
+                <!-- Necessary for testing harness: Without this dependency, a ComponentLookupException (caused by
+                     RepositorySystem) could occur. See: http://stackoverflow.com/a/16707144 -->
+                <groupId>org.apache.maven</groupId>
+                <artifactId>maven-compat</artifactId>
+                <version>${maven.in.plugins.version}</version>
+            </dependency>
+            <!-- END Maven Plugins -->
+
+            <!-- BEGIN Maven Plugins and Aether: The following dependency is needed for custom Maven plugins and for
+                 accessing Maven repositories when embedding Aether -->
+            <dependency>
+                <groupId>org.apache.maven</groupId>
+                <artifactId>maven-model</artifactId>
+                <version>${maven.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.maven</groupId>
+                <artifactId>maven-aether-provider</artifactId>
+                <!-- Note that this version must only be used when embedding Aether. For plugins, version
+                     ${maven.version} must be used! -->
+                <version>${maven.version}</version>
+            </dependency>
+            <dependency>
+                <!-- The following is necessary when using maven-aether-provider, because its POM is quite messy. It
+                     depends optionally on org.sonatype.sisu:sisu:guice:no_aop:3.2.3 (see
+                     https://github.com/apache/maven/blob/maven-3.2.5/maven-aether-provider/pom.xml#L83), which brings
+                     in guava (see https://github.com/sonatype/sisu-guice/blob/sisu-guice-3.2.3/pom.xml#L130).
+                     Unfortunately, the transitive guava dependency is not really optional:
+                     org.apache.maven.repository.internal.DefaultModelResolver imports com.google.common.base.Predicate.
+                     Also note that guava is version controlled in the Maven base POM:
+                     https://github.com/apache/maven/blob/maven-3.2.5/pom.xml#L53. -->
+                <groupId>com.google.guava</groupId>
+                <artifactId>guava</artifactId>
+                <version>${guava.version}</version>
+            </dependency>
+            <dependency>
+                <!-- The following may be necessary in order to use class
+                     org.apache.maven.model.io.xpp3.MavenXpp3Reader, whose methods may throw XmlPullParserException. -->
+                <groupId>org.codehaus.plexus</groupId>
+                <artifactId>plexus-utils</artifactId>
+                <version>${plexus.utils.version}</version>
+            </dependency>
+            <!-- END Maven and Aether -->
+
+            <dependency>
+                <groupId>com.amazonaws</groupId>
+                <artifactId>aws-java-sdk</artifactId>
+                <version>${aws.sdk.version}</version>
+            </dependency>
+
+            <!-- Aether for dynamically resolving Maven/Aether dependencies at runtime -->
+            <dependency>
+                <groupId>org.eclipse.aether</groupId>
+                <artifactId>aether-api</artifactId>
+                <version>${aether.version}</version>
+            </dependency>
+            <!-- Service provider interface -->
+            <dependency>
+                <groupId>org.eclipse.aether</groupId>
+                <artifactId>aether-spi</artifactId>
+                <version>${aether.version}</version>
+            </dependency>
+            <!-- An implementation of the repository system -->
+            <dependency>
+                <groupId>org.eclipse.aether</groupId>
+                <artifactId>aether-impl</artifactId>
+                <version>${aether.version}</version>
+            </dependency>
+            <dependency>
+                <!-- A collection of utility classes to ease usage of the repository system. -->
+                <groupId>org.eclipse.aether</groupId>
+                <artifactId>aether-util</artifactId>
+                <version>${aether.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.eclipse.aether</groupId>
+                <artifactId>aether-connector-basic</artifactId>
+                <version>${aether.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.eclipse.aether</groupId>
+                <artifactId>aether-transport-file</artifactId>
+                <version>${aether.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.eclipse.aether</groupId>
+                <artifactId>aether-transport-http</artifactId>
+                <version>${aether.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.eclipse.persistence</groupId>
+                <artifactId>org.eclipse.persistence.moxy</artifactId>
+                <version>${eclipse.link.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>javax.mail</groupId>
+                <artifactId>javax.mail-api</artifactId>
+                <version>${javax.mail.version}</version>
+            </dependency>
+
+            <!-- Use Typesafe Config for dealing with configuration files. -->
+            <dependency>
+                <groupId>com.typesafe</groupId>
+                <artifactId>config</artifactId>
+                <version>${typesafe.config.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <source>1.8</source>
+                    <target>1.8</target>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>analyze-only</goal>
+                        </goals>
+                        <configuration>
+                            <failOnWarning>true</failOnWarning>
+                            <outputXML>true</outputXML>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <phase>initialize</phase>
+                        <goals>
+                            <!-- Prepares property "argLine" pointing to the JaCoCo runtime agent that can be
+                                 passed as a VM argument to the application under test. This property needs to
+                                 be used by the surefire and failsafe plugins. -->
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-assembly-plugin</artifactId>
+                    <version>${maven.assembly.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-resources-plugin</artifactId>
+                    <version>${maven.resource.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-dependency-plugin</artifactId>
+                    <version>${maven.dependency.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-pmd-plugin</artifactId>
+                    <version>${maven.pmd.version}</version>
+                    <!-- Executions of the plugin are defined in the "analyze" profile. -->
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-checkstyle-plugin</artifactId>
+                    <version>${maven.checkstyle.version}</version>
+                    <!-- Executions of the plugin are defined in the "analyze" profile. -->
+                </plugin>
+                <plugin>
+                    <groupId>org.codehaus.mojo</groupId>
+                    <artifactId>findbugs-maven-plugin</artifactId>
+                    <version>${codehaus.findbugs.version}</version>
+                    <!-- Executions of the plugin are defined in the "analyze" profile. -->
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-failsafe-plugin</artifactId>
+                    <version>${maven.failsafe.version}</version>
+                    <executions>
+                        <execution>
+                            <goals>
+                                <goal>integration-test</goal>
+                                <goal>verify</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-jar-plugin</artifactId>
+                    <version>${maven.jar.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>${maven.compiler.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-javadoc-plugin</artifactId>
+                    <version>${maven.javadoc.version}</version>
+                    <configuration>
+                        <additionalDependencies>
+                            <additionalDependency>
+                                <groupId>com.google.code.findbugs</groupId>
+                                <artifactId>jsr305</artifactId>
+                                <version>${jsr305.version}</version>
+                            </additionalDependency>
+                        </additionalDependencies>
+                        <additionalparam>-Xdoclint:none</additionalparam>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-plugin-plugin</artifactId>
+                    <version>${maven.plugin.plugin.version}</version>
+                    <executions>
+                        <execution>
+                            <!-- In recent versions of the Maven plugin plugin, goal 'descriptor' binds to phase
+                                 'process-classes' by default. However, until Maven 3.2.1, the default lifecycle for
+                                 'maven-plugin' still bound 'descriptor' to phase 'generate-resources'. At that stage,
+                                 the classes have not yet been compiled, so @Mojo annotations would not be found.
+                                 See: http://maven.apache.org/ref/3.2.1/maven-core/default-bindings.html#Plugin_bindings_for_maven-plugin_packaging
+                                 Starting with Maven 3.2.2, this <execution> node is no longer needed.
+                                 -->
+                            <id>default-descriptor</id>
+                            <phase>process-classes</phase>
+                            <goals>
+                                <goal>descriptor</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-shade-plugin</artifactId>
+                    <version>${maven.shade.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>${maven.surefire.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-source-plugin</artifactId>
+                    <version>${maven.source.version}</version>
+                </plugin>
+
+                <plugin>
+                    <groupId>org.jacoco</groupId>
+                    <artifactId>jacoco-maven-plugin</artifactId>
+                    <version>${jacoco.version}</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+
+    <distributionManagement>
+        <site>
+            <id>github</id>
+            <name>GitHub Project Page</name>
+            <url>scm:git:https://github.com/lifecodehealth/cloudkeeper.git</url>
+        </site>
+    </distributionManagement>
+
+    <reporting>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-project-info-reports-plugin</artifactId>
+                <version>${maven.project-info-reports.version}</version>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <version>${maven.javadoc.version}</version>
+                <reportSets>
+                    <reportSet>
+                        <id>non-aggregate</id>
+                        <reports>
+                            <report>javadoc</report>
+                        </reports>
+                    </reportSet>
+                    <reportSet>
+                        <id>aggregate</id>
+                        <reports>
+                            <report>aggregate</report>
+                        </reports>
+                    </reportSet>
+                </reportSets>
+                <configuration>
+                    <additionalparam>-Xdoclint:none</additionalparam>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </reporting>
+
+    <profiles>
+        <profile>
+            <id>analyze</id>
+            <reporting>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>findbugs-maven-plugin</artifactId>
+                        <configuration>
+                            <effort>Max</effort>
+                            <xmlOutput>true</xmlOutput>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </reporting>
+        </profile>
+        <profile>
+            <id>release</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-javadoc-plugin</artifactId>
+                        <version>${maven.javadoc.version}</version>
+                        <executions>
+                            <execution>
+                                <goals>
+                                    <goal>jar</goal>
+                                    <goal>test-jar</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-source-plugin</artifactId>
+                        <version>${maven.source.version}</version>
+                        <executions>
+                            <execution>
+                                <goals>
+                                    <goal>jar-no-fork</goal>
+                                    <goal>test-jar-no-fork</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+</project>

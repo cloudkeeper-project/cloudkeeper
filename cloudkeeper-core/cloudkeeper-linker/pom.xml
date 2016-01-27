@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>cloudkeeper-linker</artifactId>
+    <packaging>jar</packaging>
+
+    <name>CloudKeeper Linker</name>
+    <description>
+        This package provides the CloudKeeper linker, which takes bare CloudKeeper interfaces and transforms them into
+        the verified and linked runtime state so that modules can be executed, port types can be interpreted, etc.
+    </description>
+
+    <parent>
+        <groupId>com.svbio.cloudkeeper.core</groupId>
+        <artifactId>cloudkeeper-core</artifactId>
+        <version>2.0.0.0-SNAPSHOT</version>
+    </parent>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.svbio.cloudkeeper.core</groupId>
+            <artifactId>cloudkeeper-model</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.svbio.cloudkeeper.core</groupId>
+            <artifactId>cloudkeeper-marshaling</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>net.florianschoppmann.java</groupId>
+            <artifactId>java-types</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.google.code.findbugs</groupId>
+            <artifactId>jsr305</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>net.florianschoppmann.java</groupId>
+            <artifactId>java-types</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.testng</groupId>
+            <artifactId>testng</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <!-- All we want the Shade plugin to do is to change any use/invocation of
+                             net.florianschoppmann.java.* to ${relocation.prefix}.java.*, which is provided by
+                             cloudkeeper-marshaling. Therefore, we include the dependency in the artifact set, but
+                             exclude its entire content in the filter. -->
+                        <configuration>
+                            <artifactSet>
+                                <includes>
+                                    <include>net.florianschoppmann.java:java-types</include>
+                                </includes>
+                            </artifactSet>
+                            <!-- Create a new POM that does not contain the artifact set. -->
+                            <createDependencyReducedPom>true</createDependencyReducedPom>
+                            <dependencyReducedPomLocation>
+                                ${project.build.directory}/dependency-reduced-pom.xml
+                            </dependencyReducedPomLocation>
+                            <filters>
+                                <filter>
+                                    <artifact>net.florianschoppmann.java:java-types</artifact>
+                                    <excludes>
+                                        <exclude>**</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                            <promoteTransitiveDependencies>true</promoteTransitiveDependencies>
+                            <!-- The relocations need to match those in cloudkeeper-marshaling! -->
+                            <relocations>
+                                <relocation>
+                                    <pattern>net.florianschoppmann.java</pattern>
+                                    <shadedPattern>${relocation.prefix}.java</shadedPattern>
+                                </relocation>
+                            </relocations>
+                            <!-- Ensure that the shaded jar will be the main artifact of the project. -->
+                            <shadedArtifactAttached>false</shadedArtifactAttached>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

@@ -1,0 +1,21 @@
+% When using TeXShop on the Mac, let it know the root document. The following must be one of the first 20 lines.
+% !TEX root = ../design.tex
+
+\chapter{Requirements}
+
+% Abstract.
+
+
+\section{Goals}
+
+Data-analysis tasks typically involve many different processing steps such as cleansing, loading, model training, scoring, etc. This is particularly true in bioinformatics, where processing steps often call closed-source software components or even external third-party entities (e.g., an external company that sequences blood samples). In the past, different processing steps and different tools have often been chained together by simple ad-hoc scripts written in general-purpose languages like bash, Python, or Perl. While this provides lots of freedom, these script languages are ill-suited for chaining data manipulation steps together. Indeed, this approach of defining workflow suffers from unneeded verbosity---making it hard to see the forest for the trees. Specifically:
+
+\begin{itemize}
+	\item Domain experts responsible for setting up workflows are not usually experts in programming. They wish to use convention-over-configuration or best-practices-over-do-it-yourself ways to define workflows.
+	\item The burden of providing modularity and reusability is placed entirely on people who implement these scripts. Consequently, reinventions of the wheel are frequent.
+	\item Most script languages are imperative languages that encourage a sequential way of thinking, which makes it hard to parallelize or distribute workflows over multiple machines or locations.
+\end{itemize}
+
+The goal of CloudKeeper is to solve the above issues, i.e., to provide a high-level interface for defining workflows. Most generally, workflows are directed graphs, where nodes represent processing steps and edges represent data flow. As such, workflows can be defined entirely by drawing connections within a graphical user interface. (More advanced users may still prefer a simple domain-specific language for defining the workflow graph.) ``Programming'' in terms of data flow transfers responsibility for ordering the processing steps to the runtime environment, i.e., the CloudKeeper core. Therefore, distributing the different processing steps efficiently across multiple machines is immediately available to all workflows and requires no user intervention.
+
+While dataflow programming has existed since the 1960's, none of the available workflow engines satisfy all of our needs.

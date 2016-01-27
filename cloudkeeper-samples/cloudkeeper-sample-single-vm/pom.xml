@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>cloudkeeper-sample-single-vm</artifactId>
+    <packaging>jar</packaging>
+
+    <name>CloudKeeper Sample: Single Virtual Machine</name>
+    <description>
+        This example demonstrates how to embed CloudKeeper into a separate project as a library. It shows how to start
+        workflow executions and wait for results.
+    </description>
+
+    <parent>
+        <groupId>com.svbio.cloudkeeper.samples</groupId>
+        <artifactId>cloudkeeper-samples</artifactId>
+        <version>2.0.0.0-SNAPSHOT</version>
+    </parent>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <configuration>
+                    <usedDependencies>
+                        <usedDependency>org.slf4j:slf4j-simple</usedDependency>
+                    </usedDependencies>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.svbio.cloudkeeper.core</groupId>
+            <artifactId>cloudkeeper-api</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.svbio.cloudkeeper.core</groupId>
+            <artifactId>cloudkeeper-basic</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.svbio.cloudkeeper.core</groupId>
+            <artifactId>cloudkeeper-dsl</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.svbio.cloudkeeper</groupId>
+            <artifactId>cloudkeeper-file-staging</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.svbio.cloudkeeper.core</groupId>
+            <artifactId>cloudkeeper-model</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.typesafe.akka</groupId>
+            <artifactId>akka-actor_2.11</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.scala-lang</groupId>
+            <artifactId>scala-library</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.testng</groupId>
+            <artifactId>testng</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

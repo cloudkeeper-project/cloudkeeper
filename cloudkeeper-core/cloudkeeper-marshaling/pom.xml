@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>cloudkeeper-marshaling</artifactId>
+    <packaging>jar</packaging>
+
+    <name>CloudKeeper Marshaling</name>
+    <description>
+        Library that facilitates marshaling of Java objects into a tree representation suitable for storage or
+        transmission. The library is versatile enough to support both in-memory tree-like data structures as well as
+        implicit tree representations (such as a file system). While self-contained by-value transmission is the
+        standard case, by-reference representations are supported, too, in case sender and receiver share common
+        memory/storage.
+    </description>
+
+    <parent>
+        <groupId>com.svbio.cloudkeeper.core</groupId>
+        <artifactId>cloudkeeper-core</artifactId>
+        <version>2.0.0.0-SNAPSHOT</version>
+    </parent>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.svbio.cloudkeeper.core</groupId>
+            <artifactId>cloudkeeper-model</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.google.code.findbugs</groupId>
+            <artifactId>jsr305</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>org.testng</groupId>
+            <artifactId>testng</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <createSourcesJar>true</createSourcesJar>
+                            <createDependencyReducedPom>true</createDependencyReducedPom>
+                            <relocations>
+                                <relocation>
+                                    <pattern>net.florianschoppmann.java</pattern>
+                                    <shadedPattern>${relocation.prefix}.java</shadedPattern>
+                                </relocation>
+                            </relocations>
+                            <!-- Ensure that the shaded jar will be the main artifact of the project. -->
+                            <shadedArtifactAttached>false</shadedArtifactAttached>
+                            <dependencyReducedPomLocation>
+                                ${project.build.directory}/dependency-reduced-pom.xml
+                            </dependencyReducedPomLocation>
+                            <artifactSet>
+                                <includes>
+                                    <include>net.florianschoppmann.java:java-types</include>
+                                </includes>
+                            </artifactSet>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

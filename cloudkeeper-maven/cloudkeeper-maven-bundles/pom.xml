@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>cloudkeeper-maven-bundles</artifactId>
+    <packaging>jar</packaging>
+
+    <name>CloudKeeper Maven: Bundle Utilities</name>
+    <description>
+        This module provides Maven-related utility classes and methods that are used by both the CloudKeeper Maven
+        plug-in and the Maven bundle loader.
+    </description>
+
+    <parent>
+        <groupId>com.svbio.cloudkeeper.maven</groupId>
+        <artifactId>cloudkeeper-maven</artifactId>
+        <version>2.0.0.0-SNAPSHOT</version>
+    </parent>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.svbio.cloudkeeper.core</groupId>
+            <artifactId>cloudkeeper-model</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.google.code.findbugs</groupId>
+            <artifactId>jsr305</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>org.eclipse.aether</groupId>
+            <artifactId>aether-api</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.svbio.cloudkeeper.core</groupId>
+            <artifactId>cloudkeeper-api</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.testng</groupId>
+            <artifactId>testng</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <configuration>
+                    <usedDependencies>
+                        <!-- Unclear why dependency plugin otherwise complains about unused declared dependency. -->
+                        <usedDependency>com.google.code.findbugs:jsr305</usedDependency>
+                    </usedDependencies>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>

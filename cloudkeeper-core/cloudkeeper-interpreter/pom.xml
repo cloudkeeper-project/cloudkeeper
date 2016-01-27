@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>cloudkeeper-interpreter</artifactId>
+    <packaging>jar</packaging>
+
+    <name>CloudKeeper Interpreter</name>
+    <description>
+        The CloudKeeper interpreter.
+    </description>
+
+    <parent>
+        <groupId>com.svbio.cloudkeeper.core</groupId>
+        <artifactId>cloudkeeper-core</artifactId>
+        <version>2.0.0.0-SNAPSHOT</version>
+    </parent>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.svbio.cloudkeeper.core</groupId>
+            <artifactId>cloudkeeper-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.svbio.cloudkeeper.core</groupId>
+            <artifactId>cloudkeeper-model</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.google.code.findbugs</groupId>
+            <artifactId>jsr305</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>com.typesafe.akka</groupId>
+            <artifactId>akka-actor_2.11</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.scala-lang</groupId>
+            <artifactId>scala-library</artifactId>
+        </dependency>
+
+        <!-- The config library is only used in tests, but akka uses it, so we cannot declare it as scope test. -->
+        <dependency>
+            <groupId>com.typesafe</groupId>
+            <artifactId>config</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.testng</groupId>
+            <artifactId>testng</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>com.svbio.cloudkeeper.core</groupId>
+            <artifactId>cloudkeeper-linker</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.svbio.cloudkeeper.core</groupId>
+            <artifactId>cloudkeeper-marshaling</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.svbio.cloudkeeper.core</groupId>
+            <artifactId>cloudkeeper-staging</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>com.svbio.cloudkeeper.core</groupId>
+            <artifactId>cloudkeeper-testkit</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>com.typesafe.akka</groupId>
+            <artifactId>akka-testkit_2.11</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

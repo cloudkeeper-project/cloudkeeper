@@ -1,0 +1,221 @@
+% When using TeXShop on the Mac, let it know the root document. The following must be one of the first 20 lines.
+% !TEX root = ../design.tex
+
+\chapter{CloudKeeper Extensibility}
+
+% Abstract. What is the problem we want to solve?
+CloudKeeper has a layered, modular architecture that allows user-defined module definitions, languages, and types, without any modifications to the CloudKeeper core.
+
+\section{Requirements}
+
+\subsection{Non-functional}
+
+\begin{enumerate}
+	\item \label{enum:NFR:P1} Extensibility: Allow users to extend CloudKeeper according to user needs, without having to ask CloudKeeper developers for support.
+	\item \label{enum:NFR:P2} Usability: Extending CloudKeeper with user-defined modules, languages, or types should be easy (e.g., drag-and-drop-like solutions are preferable to editing configuration files).
+	\item \label{enum:NFR:P3} Deployment: Easy (no downtime) deployment of functionality across different machines
+	\item \label{enum:NFR:P4} Maintainability: Ease of development
+\end{enumerate}
+
+\subsection{Functional}
+
+\begin{itemize}
+	\item A repository of user-defined modules, languages, and types
+
+		Reason: \ref{enum:NFR:P3}: Plug-Ins should be stored in a central location that is easily accessible to users.
+
+	\item Embedding workflows in other workflows
+
+		Reason: NFR \ref{enum:NFR:P1}, \ref{enum:NFR:P2}: The easiest way to implement new module definitions should be implementing it as a CloudKeeper workflow.
+
+	\item Hot-swapping of plug-ins, i.e., add/remove plug-ins while the CloudKeeper environment is running
+
+		Reason: NFR \ref{enum:NFR:P3}
+\end{itemize}
+
+\section{Module Definitions, Languages, and Types as Plug-Ins}
+
+CloudKeeper is (will evolve into) a simple data-flow programming language, with which users develop workflows that link together modules implemented in arbitrary other programming languages (including CloudKeeper itself). As such, CloudKeeper by design is a universal tool for building new tools, and easy extensibility is a core requirement. There are many examples for similar requirements in other products: For instance, higher-level programming languages like Perl, Python, Java, etc.\ all support extensions written in C. Likewise, database systems such as PostgreSQL support user-defined functions, types, and languages as well.
+
+In CloudKeeper, all module definitions, languages, and types are implemented as plug-ins. This gives the advantages of a modular and lean architecture with well-defined interfaces and a clear separation of concerns. All plug-ins have the following properties:
+%
+\begin{enumerate}
+	\item Name: Each plug-in has a name, which follows the reverse-domain-name notation (like Java classes). It is advisable (but not enforced) that different types of plug-ins are kept in different namespaces. E.g., standard CloudKeeper modules reside in the namespace \texttt{com.svbio.cloudkeeper.modules}, whereas language definitions are kept in \texttt{com.svbio.cloudkeeper.languages}.
+
+	\item Macros: Each plug-in can provide a macro generator that will be invoked before the execution phase. These macros can be used in the configuration of other plugins, or from the module code itself. As an example, a bash language plugin may define the macro \texttt{language.bash.exe} that contains the path to the bash executable on the current system. The module declaration for a module ``XYZ'' implemented in bash may then define its command-line invocation string as \texttt{"\$\{language.bash.exe\}" "\$\{modules.current.path\}/xyz.sh"}, where \texttt{modules.current.path} is another macro (provided by the CloudKeeper core).
+\end{enumerate}
+
+\subsection{Module Declarations}
+
+Declarations of modules differ for simple modules and composite modules: Since a simple module is implemented in an arbitrary language, crucial information about in-ports and out-ports cannot be inferred but needs to be explicitly declared.
+
+\paragraph{Simple-Module Declarations}
+
+A simple module declaration contains everything any plug-in declaration contains, plus:
+%
+\begin{enumerate}
+	\item In-ports: A list of the in-ports that this module expects.
+	\item Out-ports: A list of the out-ports that this module provides.
+	\item Command: The command line that should be used to invoke this module. This needs to be a single bash command. The execution happens as follows: First, all macros (i.e., substrings of form \texttt{\$\{macro-name\}}) are substituted with their actual values. Then, the actual command line is passed to bash for execution. Typical command lines might look like:
+		\begin{itemize}
+			\item \texttt{"\$\{language.bash.exe\}" "\$\{modules.current.path\}/xyz.sh"}
+			\item \texttt{"\$\{language.java.exe\}" -jar "\$\{modules.current.path\}/xyz.jar" xzy}
+		\end{itemize}
+	\item Interface version: The interface version this module expects. This includes the low-level interface (e.g., the local directories where a module can expect its input, and where it should write its outputs to) as well as the language API.
+
+		Should future version of CloudKeeper necessitate interface changes, CloudKeeoper can still execute versioned modules by using the appropriate legacy executor and legacy language API.
+	\item Deterministic: Does this module return the same result whenever it is called with the same arguments? Modules that access information outside the control of CloudKeeper (e.g., pseudo-random number generators, the Internet, etc.) are \emph{not} deterministic.
+\end{enumerate}
+
+\paragraph{Composite Module Declarations}
+
+A composite-module declaration contains everything any plug-in declaration contains, plus:
+%
+\begin{enumerate}
+	\item Definition: A function that instantiates a \texttt{CompositeModule} object using the data structures as described in Section~\ref{sec:Workflow:ClassStructure}. This indirection exists because composite modules may be defined in different ways:
+		\begin{itemize}
+			\item Programmatically in Java, using the API to build the data structures, as described in Section~\ref{sec:Workflow:ClassStructure}. In this case, the definition is just a ``function pointer'' to the function containing the programmatic workflow definition.
+			\item Using a domain-specific language as described in Chapter~\ref{ch:DSL}. In this case, the definition is the CloudKeeper function that translates the DSL code into the internal workflow representation.
+		\end{itemize}
+\end{enumerate}
+
+\subsection{Language}
+
+A language declaration currently contains only whatever a plugin declaration contains. In the future, language declarations may provide additional information. Possible options:
+\begin{itemize}
+	\item Whether a language is considered ``secure'' (execution can be sandboxed) or ``insecure'' (execution may theoretically bring down the whole machine)
+	\item A validator that checks whether a module may properly execute (e.g., it may perform syntactical correctness checks of scripts during workflow definition time, rather than at runtime)
+\end{itemize}
+
+\subsection{Persistence of Plug-Ins}
+
+Plug-Ins can be added and removed while CloudKeeper is running. For ease of deployment, CloudKeeper plug-ins are stored in the CloudKeeper distributed file store, under the \texttt{/system} hierarchy (see Chapter~\ref{ch:FileStore}). The default replication level for each file under in this directory is ``everywhere''.
+Plug-ins are declared using JSON configuration files.
+
+\begin{example}
+Suppose we implement a module \texttt{com.svbio.cloudkeeper.modules.sum} in bash that sums up two integers. It consists of the following two files under \\\texttt{/system/com/svbio/cloudkeeper/modules/sum}:
+\begin{itemize}
+	\item \texttt{Info.json}: The module declaration. It might look as follows:
+		\begin{lstlisting}[gobble=12]
+			{
+			   "type": "com.svbio.cloudkeeper.metadata.SimpleModuleDeclaration"
+			   "name": "com.svbio.cloudkeeper.modules.sum",
+			   "command": "${language.bash.exe}" ${modules.current.path}/sum.sh",
+			   "inports": [ {
+			           "name": "Num1",
+			           "elementtype": "com.svbio.cloudkeeper.types.integer",
+			           "dimension": 0
+			       }, {
+			           "name": "Num2",
+			           "elementtype": "com.svbio.cloudkeeper.types.integer",
+			           "dimension": 0
+			       }
+			   ],
+			   "outports": [ {
+			           "name": "Sum",
+			           "elementtype": "com.svbio.cloudkeeper.types.integer",
+			           "dimension": 0
+			       }
+			   ],
+			   "deterministic": true
+			}
+		\end{lstlisting}
+	\item \texttt{sum.sh}: The bash script that does the actual work. It might look as follows:
+		\begin{lstlisting}[gobble=12]
+			#!/bin/bash
+			NUM1=$(getInput Num1)
+			NUM2=$(getInput Num2)
+			RESULT=$(echo "$NUM1 + $NUM2" | bc)
+			setOutput Sum "$RESULT"
+		\end{lstlisting}
+\end{itemize}
+Of course, languages and types (e.g., \texttt{com.svbio.cloudkeeper.types.integer}) are declared correspondingly.
+\end{example}
+
+\subsection{Class Structure}
+
+Plugin declarations are represented by \texttt{PluginDefinition} objects. The class structure is shown in Figure~\ref{fig:PlugIns:Classes}.
+
+Moreover, there is a \texttt{Repository} interface for loading plug-ins from persistent storage into \texttt{PluginDefinition} objects (see Figure~\ref{fig:PlugIns:RepositoryClasses}). An implementation complying with the previous section would scan the \texttt{/system} hierarchy in the file store, parse the \texttt{Info.json} files, and then instantiate the in-memory objects accordingly. For testing and during development, mock \texttt{Repository} objects can be used that generate \texttt{PluginDefinition} objects on-the-fly. When referring to plugins, it is generally cumbersomes having to deal with long names like \texttt{com.svbio.cloudkeeper.modules.sum}. Instead, it is convenient to have the notion of a current namespace and a set of imported names (like, e.g., in Java, where the current namespace is the package where the current class is defined, and names can be imported using the \texttt{import} statement). The equivalent in CloudKeeper is represented by the \texttt{Context} interface. A \texttt{Context} an be created from a \texttt{Repository} using the \texttt{createContextBuilder()} method, which sets the current namespace. Afterwards, the \texttt{addImport()} method may be used on the \texttt{ContextBuilder} object to bring other names into the current scope (context).
+
+\begin{figure}
+\tikzumlset{font=\ttfamily\small}
+\centering
+\begin{tikzpicture}
+	\umlclass[x=0,y=6]{PortDefinition}{%
+		+ name: String
+	}{%
+	}
+
+	\umlclass[x=0,y=3,type=interface]{PortType}{%
+		+ elementType: Class<?> \\
+		+ dimensions: int
+	}{%
+	}
+
+	\umlclass[x=6,y=15,type=interface]{PluginDefinition}{%
+	}{%
+		+ getName(): String\\
+		+ getMacros(): Map<String, String>
+	}
+
+	\umlclass[x=3,y=12]{AbstractModuleDefinition}{%
+		+ name: String
+	}{%
+		+ newInstance(name: String): AbstractModule
+	}
+	\umlinherit{AbstractModuleDefinition}{PluginDefinition}
+
+	\umlclass[x=10,y=12]{LanguageDefinition}{%
+	}{%
+	}
+	\umlinherit{LanguageDefinition}{PluginDefinition}
+
+	\umlclass[x=0,y=9]{SimpleModuleDefinition}{%
+		+ interfaceVersion: int \\
+		+ command: String \\
+
+	}{%
+	}
+	\umlinherit{SimpleModuleDefinition}{AbstractModuleDefinition}
+
+	\umlclass[x=6,y=9]{CompositeModuleDefinition}{%
+		+ definition:\\
+		  (CompositeModule -> void)
+	}{%
+	}
+	\umlinherit{CompositeModuleDefinition}{AbstractModuleDefinition}
+
+	\umluniassoc[arg={+ type}]{PortDefinition}{PortType}
+	\umluniaggreg[arg={+ inPorts}, mult=*, pos=0.5, anchor1=-140, anchor2=150]{SimpleModuleDefinition}{PortDefinition}
+	\umluniaggreg[arg={+ outPorts}, mult=*, pos=0.5, anchor1=-40, anchor2=30]{SimpleModuleDefinition}{PortDefinition}
+\end{tikzpicture}
+\caption{Extensibiliy classes.\label{fig:PlugIns:Classes}}
+\end{figure}
+
+\begin{figure}
+\tikzumlset{font=\ttfamily\small}
+\centering
+\begin{tikzpicture}
+	\umlclass[x=0,y=0,type=interface]{Repository.ContextBuilder}{%
+	}{%
+		+ addImport(String name): \\ContextBuilder\\
+		+ build(): Context
+	}
+
+	\umlclass[x=9,y=5,type=interface]{Context}{%
+	}{%
+		+ getPlugin(): PluginDefinition\\
+		+ getModuleDefinition(): \\AbstractModuleDefinition\\
+		+ getLanguageDefinition(): \\LanguageDefinition
+	}
+
+	\umlclass[x=9,y=0,type=interface]{Repository}{%
+	}{%
+		+ createContextBuilder\\(currentNamespace: String): \\ContextBuilder\\
+		+ getMacros(): Map<String,String>
+	}
+	\umlinherit{Repository}{Context}
+\end{tikzpicture}
+\caption{Repository and Namespace Interfaces.\label{fig:PlugIns:RepositoryClasses}}
+\end{figure}

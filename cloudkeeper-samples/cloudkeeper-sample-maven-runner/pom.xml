@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>cloudkeeper-sample-maven-runner</artifactId>
+    <packaging>jar</packaging>
+
+    <name>CloudKeeper Sample: Maven Runner</name>
+    <description>
+        This example demonstrates how to embed CloudKeeper into a separate project as a library. It shows how to start
+        workflow executions and wait for results.
+    </description>
+
+    <parent>
+        <groupId>com.svbio.cloudkeeper.samples</groupId>
+        <artifactId>cloudkeeper-samples</artifactId>
+        <version>2.0.0.0-SNAPSHOT</version>
+    </parent>
+
+    <properties>
+        <test.maven.assemblyid>testrepo</test.maven.assemblyid>
+        <test.maven.rootdir>repository</test.maven.rootdir>
+        <test.maven.bundle>cloudkeeper-sample-maven-bundle</test.maven.bundle>
+    </properties>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                        <configuration>
+                            <attach>false</attach>
+                            <descriptors>
+                                <descriptor>src/main/assembly/distribution.xml</descriptor>
+                                <descriptor>src/main/assembly/testrepo.xml</descriptor>
+                            </descriptors>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <!-- Specifying the version again is unnecessary, but without it IntelliJ 14.1.4 would flag
+                     "ignoredUnusedDeclaredDependencies" as "not allowed here" (this is obviously a bug). -->
+                <version>${maven.dependency.version}</version>
+                <configuration>
+                    <ignoredUnusedDeclaredDependencies>
+                        <ignoredUnusedDeclaredDependency>org.slf4j:slf4j-simple</ignoredUnusedDeclaredDependency>
+                        <ignoredUnusedDeclaredDependency>com.google.guava:guava</ignoredUnusedDeclaredDependency>
+                        <ignoredUnusedDeclaredDependency>
+                            com.svbio.cloudkeeper.core:cloudkeeper-dsl
+                        </ignoredUnusedDeclaredDependency>
+                        <ignoredUnusedDeclaredDependency>
+                            ${project.groupId}:${test.maven.bundle}
+                        </ignoredUnusedDeclaredDependency>
+                        <ignoredUnusedDeclaredDependency>
+                            ${project.groupId}:${test.maven.bundle}:ckbundle
+                        </ignoredUnusedDeclaredDependency>
+                    </ignoredUnusedDeclaredDependencies>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <configuration>
+                    <classpathDependencyExcludes>
+                        <classpathDependencyExclude>${project.groupId}:${test.maven.bundle}</classpathDependencyExclude>
+                    </classpathDependencyExcludes>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <addClasspath>true</addClasspath>
+                            <mainClass>com.svbio.cloudkeeper.samples.maven.ModuleRunner</mainClass>
+                        </manifest>
+                    </archive>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <configuration>
+                    <escapeString>\</escapeString>
+                </configuration>
+            </plugin>
+        </plugins>
+
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+            </resource>
+        </resources>
+
+        <testResources>
+            <testResource>
+                <directory>src/test/resources</directory>
+                <filtering>true</filtering>
+            </testResource>
+        </testResources>
+    </build>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.svbio.cloudkeeper.core</groupId>
+            <artifactId>cloudkeeper-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.svbio.cloudkeeper.core</groupId>
+            <artifactId>cloudkeeper-basic</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.svbio.cloudkeeper.core</groupId>
+            <artifactId>cloudkeeper-dsl</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.svbio.cloudkeeper.core</groupId>
+            <artifactId>cloudkeeper-linker</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.svbio.cloudkeeper.core</groupId>
+            <artifactId>cloudkeeper-model</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.svbio.cloudkeeper.maven</groupId>
+            <artifactId>cloudkeeper-maven-bundle-loader</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.svbio.cloudkeeper.maven</groupId>
+            <artifactId>cloudkeeper-maven-bundles</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.eclipse.aether</groupId>
+            <artifactId>aether-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.eclipse.aether</groupId>
+            <artifactId>aether-spi</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.eclipse.aether</groupId>
+            <artifactId>aether-impl</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.eclipse.aether</groupId>
+            <artifactId>aether-connector-basic</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.eclipse.aether</groupId>
+            <artifactId>aether-transport-file</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.eclipse.aether</groupId>
+            <artifactId>aether-transport-http</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.maven</groupId>
+            <artifactId>maven-aether-provider</artifactId>
+        </dependency>
+
+        <dependency>
+            <!-- Needed because of maven-aether-provider. See base POM. -->
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>com.typesafe.akka</groupId>
+            <artifactId>akka-actor_2.11</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.scala-lang</groupId>
+            <artifactId>scala-library</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.typesafe</groupId>
+            <artifactId>config</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- The following dependencies are excluded from the Maven failsafe classpath. They exist only for the Maven
+             reactor and for the Assembly plugin that generates the test Maven repository. -->
+        <dependency>
+            <groupId>com.svbio.cloudkeeper.samples</groupId>
+            <artifactId>cloudkeeper-sample-maven-bundle</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.svbio.cloudkeeper.samples</groupId>
+            <artifactId>cloudkeeper-sample-maven-bundle</artifactId>
+            <version>${project.version}</version>
+            <type>ckbundle</type>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.testng</groupId>
+            <artifactId>testng</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

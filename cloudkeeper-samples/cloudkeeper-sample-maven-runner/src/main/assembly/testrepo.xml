@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<assembly xmlns="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/1.1.3"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/1.1.3 http://maven.apache.org/xsd/assembly-1.1.3.xsd">
+
+    <id>${test.maven.assemblyid}</id>
+    <includeBaseDirectory>false</includeBaseDirectory>
+    <formats>
+        <format>dir</format>
+    </formats>
+    <repositories>
+        <repository>
+            <outputDirectory>${test.maven.rootdir}</outputDirectory>
+            <includes>
+                <include>
+                    ${project.groupId}:${test.maven.bundle}:ckbundle:${project.version}
+                </include>
+                <include>
+                    ${project.groupId}:${test.maven.bundle}:jar:${project.version}
+                </include>
+            </includes>
+            <scope>test</scope>
+        </repository>
+    </repositories>
+</assembly>

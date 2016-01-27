@@ -1,0 +1,12 @@
+#!/bin/bash -e
+
+# Start Maven-based CloudKeeper module runner
+# -------------------------------------------
+
+# Absolute root path
+home=$(cd "$(dirname "${BASH_SOURCE}")/.."; pwd)
+cd "${home}"
+
+java \
+    "$@" \
+    -jar lib/${project.build.finalName}.jar

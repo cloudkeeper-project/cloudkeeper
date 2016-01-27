@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>cloudkeeper-model</artifactId>
+    <packaging>jar</packaging>
+
+    <name>CloudKeeper Language Model</name>
+    <description>
+        Interfaces and classes that constitute the domain model of the CloudKeeper Dataflow Language. This includes
+        elements of the language like declarations, modules, ports, and types, as well as uses/invocations of these
+        elements. This package also includes Java Bean-style classes with JAXB (Java Architecture for XML Binding)
+        annotations that facilitate XML marshalling and unmarshalling.
+    </description>
+
+    <parent>
+        <groupId>com.svbio.cloudkeeper.core</groupId>
+        <artifactId>cloudkeeper-core</artifactId>
+        <version>2.0.0.0-SNAPSHOT</version>
+    </parent>
+
+    <dependencies>
+        <dependency>
+            <groupId>net.florianschoppmann.java</groupId>
+            <artifactId>java-types</artifactId>
+            <version>${types.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.google.code.findbugs</groupId>
+            <artifactId>jsr305</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>org.testng</groupId>
+            <artifactId>testng</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- BEGIN Testing JAXB annotations with EclipseLink MOXy. -->
+        <dependency>
+            <groupId>org.eclipse.persistence</groupId>
+            <artifactId>org.eclipse.persistence.moxy</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <!-- Necessary because of a bug in EclipseLink MOXy: http://stackoverflow.com/q/22022994
+                 See also dependency-plugin configuration below. -->
+            <groupId>javax.mail</groupId>
+            <artifactId>javax.mail-api</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- END Testing JAXB annotations with EclipseLink MOXy. -->
+    </dependencies>
+
+    <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+                <includes>
+                    <include>com/svbio/cloudkeeper/model/util/build.properties</include>
+                </includes>
+            </resource>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>false</filtering>
+                <excludes>
+                    <exclude>com/svbio/cloudkeeper/model/util/build.properties</exclude>
+                </excludes>
+            </resource>
+        </resources>
+
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <configuration>
+                    <usedDependencies>
+                        <!-- Necessary because of a bug in EclipseLink MOXy: http://stackoverflow.com/q/22022994 -->
+                        <usedDependency>javax.mail:javax.mail-api</usedDependency>
+                    </usedDependencies>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

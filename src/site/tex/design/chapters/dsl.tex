@@ -1,0 +1,64 @@
+% When using TeXShop on the Mac, let it know the root document. The following must be one of the first 20 lines.
+% !TEX root = ../design.tex
+
+\chapter{Workflow Langauge} \label{ch:DSL}
+
+% Abstract. What is the problem we want to solve?
+CloudKeeper is a simple data-flow programming language, with which users develop workflows that link together modules implemented in arbitrary other programming languages (including CloudKeeper itself). This language has a very simple grammar, is therefore easy to learn, is statically typed, has full type inference, and bears resemblance to modern programming languages like Scala and Java.
+
+\section{Requirements}
+
+\subsection{Non-functional}
+
+\begin{enumerate}
+	\item \label{enum:NFR:D1} Usability: Ease of use
+\end{enumerate}
+
+\subsection{Functional}
+
+\begin{itemize}
+	\item Allow easy conversion between a graphical representation and code
+		
+		Reason: NFR \ref{enum:NFR:D1}
+\end{itemize}
+
+\section{Domain-Specific Language}
+
+It is most instructive to start with an example. The workflow shown in Figure~\ref{fig:WorkflowExample} could defined using the CloudKeeper language as follows:
+
+\begin{lstlisting}
+package com.svbio.cloudkeeper.modules;
+
+def logRegr = (path) -> {
+    initialLL = "-infinity"
+    initialZeroVector = null
+    loop = loop((path = path, coef = initialZeroVector, loglikelihood = initialLL) -> {
+        splitInput = split_input(path)
+        logRegrStep = log_regr_step(file = splitInput.files, coef = coef)
+        sumXtX = sum(logRegrStep.XtX)
+        invertXtX = invert_matrix(sumXtX)
+        sumXty = sum(logRegrStep.Xty)
+        newCoef = prod([invertXtX, sumXty])
+        sumLL = sum(logRegrStep.loglikelihood)
+        checkLL = check_ll(oldLL = loglikelihood, newLL = sumLL)
+        return (continue = checkLL.continue, coef = newCoef, loglikelihood = sumLL)
+    })
+    return (coef = loop.coef)
+}
+\end{lstlisting}
+
+Crucial properties of the language are:
+\begin{itemize}
+	\item Support for both named arguments and named return values.
+	\item Workflows are first-class values (even though in the first implementation, they may only be used in for, switch, and loop blocks).
+	\item Execution order is independent of the statement order, and is only dependent on the directed graph defined by the statements. However, for simplicity, names need to be defined before they can be used, i.e., not every permutation of the statements within a block is a valid program. (This constraint is possible because workflows graphs are acyclic.)
+\end{itemize}
+
+Line 14 could be replaced by native CloudKeeper code:
+\begin{lstlisting}
+        checkLL = switch(value = abs(sumLL - loglikelihood) < 0.001, {
+            "true": { return (continue = true) },
+            "false": { return (continue = false) }
+        })
+\end{lstlisting}
+Here, the second argument to \texttt{switch} is a dictionary (which uses the same notation as in Python).

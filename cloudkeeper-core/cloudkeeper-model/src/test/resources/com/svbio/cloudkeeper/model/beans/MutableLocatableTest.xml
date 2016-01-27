@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<executable xmlns="http://www.svbio.com/cloudkeeper/1.0.0">
+
+    <!-- This is a random comment that only serves to insert lines into the
+         XML, in order to test that the source-code location is determined
+         correctly. -->
+    <proxy-module ref="test.Sum">
+
+        <!-- The name only exists testing. -->
+        <simple-name>sum</simple-name>
+
+    </proxy-module>
+
+</executable>

@@ -1,0 +1,11 @@
+% When using TeXShop on the Mac, let it know the root document. The following must be one of the first 20 lines.
+% !TEX root = ../design.tex
+
+\chapter{Type System} \label{sec:TypeSystem}
+
+An out-port is \emph{type-compatible} with an in-port if one of the following criteria holds:
+\begin{itemize}
+	\item the out-port type and in-port type are the same
+	\item there is an implicit conversion rule from the out-port type to the in-port type
+	\item one of the previous two conditions holds, and data parallelism can be inferred from the edge.
+\end{itemize}
