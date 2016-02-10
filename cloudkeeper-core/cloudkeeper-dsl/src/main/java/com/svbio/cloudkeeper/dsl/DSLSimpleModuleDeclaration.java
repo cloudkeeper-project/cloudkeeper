@@ -46,7 +46,7 @@ final class DSLSimpleModuleDeclaration extends DSLModuleDeclaration implements B
     }
 
     @Override
-    public final List<? extends BarePort> getPorts() {
+    public List<? extends BarePort> getPorts() {
         return simpleModule.getDeclaredPortsInternal();
     }
 }

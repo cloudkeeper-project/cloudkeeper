@@ -122,7 +122,8 @@ public final class ForkedExecutors {
      * streams that are guaranteed to be closed elsewhere. Example use:
      *
      * <p>{@code
-     * try (ObjectOutputStream objectOutputStream = new ObjectOutputStream(new NonClosingOutputStream(existingStream))) {
+     * try (ObjectOutputStream objectOutputStream
+     *         = new ObjectOutputStream(new NonClosingOutputStream(existingStream))) {
      *     // ...
      * }
      * }

@@ -81,7 +81,7 @@ final class SerializationRootImpl extends SerializationNodeImpl implements Runti
     }
 
     @Override
-    final void finishFreezable(FinishContext context) throws LinkerException {
+    void finishFreezable(FinishContext context) throws LinkerException {
         assert serializationReference != null : "must be non-null if created unfinished";
         serializationDeclaration = context.getDeclaration(
             BareSerializationDeclaration.NAME, SerializationDeclarationImpl.class, serializationReference);

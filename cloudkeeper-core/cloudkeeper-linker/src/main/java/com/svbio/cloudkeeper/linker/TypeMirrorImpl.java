@@ -93,8 +93,8 @@ abstract class TypeMirrorImpl extends LocatableImpl implements RuntimeTypeMirror
             assert parentContext != null;
             try {
                 Preconditions.requireCondition(false, parentContext.newContextForChild(original),
-                    "Type %s is neither a declared type, a type variable, a wildcard type argument, nor a no-type " +
-                        "pseudo type.", original);
+                    "Type %s is neither a declared type, a type variable, a wildcard type argument, nor a no-type "
+                        + "pseudo type.", original);
                 return null;
             } catch (LinkerException exception) {
                 return Try.failure(exception);

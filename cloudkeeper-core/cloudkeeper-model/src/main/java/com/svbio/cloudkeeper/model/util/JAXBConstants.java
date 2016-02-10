@@ -8,5 +8,7 @@ public final class JAXBConstants {
     }
 
     public static final String NAMESPACE = "http://www.svbio.com/cloudkeeper/1.0.0";
-    public static final String LOCATION = XmlSchema.NO_LOCATION;  //"http://www.florian-schoppmann.net/cloudkeeper-v1_0_0.xsd";
+
+    // "http://www.florian-schoppmann.net/cloudkeeper-v1_0_0.xsd";
+    public static final String LOCATION = XmlSchema.NO_LOCATION;
 }

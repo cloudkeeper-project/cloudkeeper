@@ -21,6 +21,9 @@ import java.util.List;
 import java.util.Optional;
 
 final class FinishContext {
+    private static final Name CLOUD_KEEPER_ELEMENT_REFERENCE_NAME
+        = Name.qualifiedName(CloudKeeperElementReference.class.getName());
+    private static final Name OBJECT_NAME = Name.qualifiedName(Object.class.getName());
     private final LinkerImpl linker;
     @Nullable private final FinishContext parentContext;
 
@@ -145,7 +148,7 @@ final class FinishContext {
 
     IElementImpl getElement(AnnotationValueImpl annotationValue) throws LinkerException {
         AnnotationEntryImpl enclosingEntry = getRequiredEnclosingFreezable(AnnotationEntryImpl.class);
-        if (enclosingEntry.getKey().getDeclaredAnnotation(Name.qualifiedName(CloudKeeperElementReference.class.getName())) != null) {
+        if (enclosingEntry.getKey().getDeclaredAnnotation(CLOUD_KEEPER_ELEMENT_REFERENCE_NAME) != null) {
             Object value = annotationValue.getValue();
             Preconditions.requireCondition(value instanceof List<?> || value instanceof String,
                 annotationValue.getCopyContext(),
@@ -202,7 +205,7 @@ final class FinishContext {
             @SuppressWarnings("unchecked")
             Class<? extends T> typeClass = (Class<? extends T>) untypedClass;
             return typeClass;
-        } catch (ClassNotFoundException|RuntimeStateProvisionException exception) {
+        } catch (ClassNotFoundException | RuntimeStateProvisionException exception) {
             throw new PreprocessingException(String.format(
                 "Could not resolve class for plug-in declaration '%s'.", pluginDeclaration.getQualifiedName()
             ), exception, pluginDeclaration.getCopyContext().toLinkerTrace());
@@ -226,7 +229,7 @@ final class FinishContext {
 
         try {
             return clazz.getConstructor().newInstance();
-        } catch (InstantiationException|IllegalAccessException|NoSuchMethodException|InvocationTargetException
+        } catch (InstantiationException | IllegalAccessException | NoSuchMethodException | InvocationTargetException
                 exception) {
             throw new PreprocessingException(String.format("Could not instantiate %s.", clazz), exception,
                 pluginDeclaration.getCopyContext().toLinkerTrace());
@@ -242,7 +245,7 @@ final class FinishContext {
 
     DeclaredTypeImpl getObjectType() {
         @Nullable TypeDeclarationImpl objectDeclaration
-            = elementResolver.getElement(TypeDeclarationImpl.class, Name.qualifiedName(Object.class.getName()));
+            = elementResolver.getElement(TypeDeclarationImpl.class, OBJECT_NAME);
         if (objectDeclaration == null) {
             throw new IllegalStateException(String.format(
                 "Could not find required CloudKeeper type declaration for %s.", Object.class.getName()

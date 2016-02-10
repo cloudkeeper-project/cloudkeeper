@@ -330,7 +330,7 @@ abstract class PortImpl extends AnnotatedConstructImpl implements IPortImpl, IEl
         }
 
         @Override
-        public final String toString() {
+        public String toString() {
             return BareIOPort.Default.toString(this);
         }
 
@@ -388,7 +388,7 @@ abstract class PortImpl extends AnnotatedConstructImpl implements IPortImpl, IEl
         }
 
         @Override
-        public final String toString() {
+        public String toString() {
             return BareInPort.Default.toString(this);
         }
 
@@ -438,7 +438,7 @@ abstract class PortImpl extends AnnotatedConstructImpl implements IPortImpl, IEl
         }
 
         @Override
-        public final String toString() {
+        public String toString() {
             return BareOutPort.Default.toString(this);
         }
 

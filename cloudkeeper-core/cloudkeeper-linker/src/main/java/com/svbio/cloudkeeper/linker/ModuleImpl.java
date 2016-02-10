@@ -45,7 +45,7 @@ abstract class ModuleImpl extends AnnotatedConstructImpl implements RuntimeModul
     @Override
     public abstract String toString();
 
-    private static class CopyVisitor implements BareModuleVisitor<Try<? extends ModuleImpl>, CopyContext> {
+    private static final class CopyVisitor implements BareModuleVisitor<Try<? extends ModuleImpl>, CopyContext> {
         private final int index;
 
         private CopyVisitor(int index) {
@@ -76,7 +76,8 @@ abstract class ModuleImpl extends AnnotatedConstructImpl implements RuntimeModul
 
         @Override
         @Nullable
-        public Try<ProxyModuleImpl> visitLinkedModule(BareProxyModule linkedModule, @Nullable CopyContext parentContext) {
+        public Try<ProxyModuleImpl> visitLinkedModule(BareProxyModule linkedModule,
+                @Nullable CopyContext parentContext) {
             assert parentContext != null;
             return Try.run(() -> new ProxyModuleImpl(linkedModule, parentContext, index));
         }

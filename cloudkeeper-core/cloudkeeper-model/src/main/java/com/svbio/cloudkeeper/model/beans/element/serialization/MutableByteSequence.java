@@ -25,7 +25,8 @@ public final class MutableByteSequence
     }
 
     @Nullable
-    public static MutableByteSequence copyOfByteSequence(@Nullable BareByteSequence original, CopyOption... copyOptions) {
+    public static MutableByteSequence copyOfByteSequence(@Nullable BareByteSequence original,
+            CopyOption... copyOptions) {
         return original == null
             ? null
             : new MutableByteSequence(original, copyOptions);

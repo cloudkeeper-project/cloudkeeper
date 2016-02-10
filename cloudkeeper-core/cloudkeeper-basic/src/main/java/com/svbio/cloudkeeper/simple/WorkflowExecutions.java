@@ -31,7 +31,7 @@ public final class WorkflowExecutions {
         private T await(long timeout, TimeUnit unit) throws AwaitException, TimeoutException, InterruptedException {
             try {
                 return Await.result(promise.future(), Duration.create(timeout, unit));
-            } catch (TimeoutException|InterruptedException exception) {
+            } catch (TimeoutException | InterruptedException exception) {
                 throw exception;
             } catch (Exception exception) {
                 throw new AwaitException(exception);

@@ -1,6 +1,5 @@
 package com.svbio.cloudkeeper.model.api.executor;
 
-import com.svbio.cloudkeeper.model.api.ExecutionException;
 import com.svbio.cloudkeeper.model.api.RuntimeStateProvider;
 import com.svbio.cloudkeeper.model.immutable.element.SimpleName;
 import scala.concurrent.Future;
@@ -42,7 +41,8 @@ public interface SimpleModuleExecutor {
      *     successful execution, the {@link String} contains a reason for cancellation. May be null.
      * @return Future representing pending completion of the task. The future will be completed with a
      *     {@link SimpleModuleExecutorResult}. If the module execution fails,
-     *     {@link SimpleModuleExecutorResult#getExecutionException() contains an {@link ExecutionException}. Only if an
+     *     {@link SimpleModuleExecutorResult#getExecutionException()} contains a
+     *     {@link com.svbio.cloudkeeper.model.api.ExecutionException}. Only if an
      *     unexpected error occurs, the future may be completed with any other {@link Throwable}.
      * @throws NullPointerException if the first argument is null
      */

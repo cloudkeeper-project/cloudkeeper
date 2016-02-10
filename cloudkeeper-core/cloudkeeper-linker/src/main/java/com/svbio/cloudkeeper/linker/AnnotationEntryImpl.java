@@ -89,7 +89,7 @@ final class AnnotationEntryImpl
     void preProcessFreezable(FinishContext context) { }
 
     @Override
-    final void finishFreezable(FinishContext context) throws LinkerException {
+    void finishFreezable(FinishContext context) throws LinkerException {
         key = context.getAnnotationTypeElement(keyReference);
     }
 

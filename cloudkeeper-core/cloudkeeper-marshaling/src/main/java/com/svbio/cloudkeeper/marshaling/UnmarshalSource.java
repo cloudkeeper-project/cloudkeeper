@@ -39,8 +39,8 @@ import java.io.IOException;
  * </li></ul>
  *
  * <p>If the instances of a subclass are only passed to
- * {@link DelegatingUnmarshalContext#create(UnmarshalSource, ClassLoader)} and used in no other way, it is not necessary for
- * that subclass to validate state or arguments. It is acceptable to unconditionally throw
+ * {@link DelegatingUnmarshalContext#create(UnmarshalSource, ClassLoader)} and used in no other way, it is not necessary
+ * for that subclass to validate state or arguments. It is acceptable to unconditionally throw
  * {@link UnsupportedOperationException} in these "impossible" cases.
  */
 public interface UnmarshalSource {

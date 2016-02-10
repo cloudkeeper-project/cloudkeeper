@@ -424,7 +424,8 @@ public final class DelegatingMarshalContext implements MarshalContext {
 
         @Nullable
         @Override
-        public IOException visitMarshaledObjectNode(MarshaledObjectNode node, @Nullable DelegatingMarshalContext context) {
+        public IOException visitMarshaledObjectNode(MarshaledObjectNode node,
+                @Nullable DelegatingMarshalContext context) {
             assert context != null;
             for (Map.Entry<Key, MarshalingTreeNode> entry : node.getChildren().entrySet()) {
                 @Nullable IOException exception = entry.getValue().accept(context.nodeVisitor, entry.getKey());

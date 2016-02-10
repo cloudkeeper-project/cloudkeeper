@@ -6,9 +6,9 @@
  * primary end users are user-defined core CloudKeeper components.
  *
  * <ul><li>
- *     Instances of {@link com.svbio.cloudkeeper.model.api.ModuleConnector} are passed to CloudKeeper modules in order to
- *     retrieve inputs and set outputs. However, the CloudKeeper DSL component provides an abstraction layer around this
- *     interface.
+ *     Instances of {@link com.svbio.cloudkeeper.model.api.ModuleConnector} are passed to CloudKeeper modules in order
+ *     to retrieve inputs and set outputs. However, the CloudKeeper DSL component provides an abstraction layer around
+ *     this interface.
  * </li><li>
  *     User-defined {@link com.svbio.cloudkeeper.model.api.Marshaler} implementations are the core part of a
  *     CloudKeeper serialization plugin.

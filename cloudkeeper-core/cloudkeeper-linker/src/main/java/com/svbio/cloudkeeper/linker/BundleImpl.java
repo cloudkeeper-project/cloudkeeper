@@ -68,7 +68,7 @@ final class BundleImpl extends LocatableImpl implements RuntimeBundle, ElementRe
     }
 
     @Override
-    final void collectEnclosed(Collection<AbstractFreezable> freezables) {
+    void collectEnclosed(Collection<AbstractFreezable> freezables) {
         freezables.addAll(packages.values());
     }
 

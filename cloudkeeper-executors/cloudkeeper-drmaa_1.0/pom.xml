@@ -28,6 +28,16 @@
                     <target>1.4</target>
                 </configuration>
             </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-checkstyle-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>checkstyle</id>
+                        <phase/>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 </project>

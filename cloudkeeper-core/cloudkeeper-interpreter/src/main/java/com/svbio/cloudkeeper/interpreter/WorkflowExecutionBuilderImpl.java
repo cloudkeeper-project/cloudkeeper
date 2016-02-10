@@ -260,7 +260,7 @@ final class WorkflowExecutionBuilderImpl implements WorkflowExecutionBuilder {
                 }, executionContext);
         }
 
-        private static class RuntimeState {
+        private static final class RuntimeState {
             private final RuntimeContext runtimeContext;
             private final StagingArea stagingArea;
 
@@ -290,7 +290,9 @@ final class WorkflowExecutionBuilderImpl implements WorkflowExecutionBuilder {
                             = runtimeContext.newAnnotatedExecutionTrace(ExecutionTrace.empty(), module, overrides);
                         StagingArea stagingArea = cloudKeeperEnvironment
                             .getStagingAreaProvider()
-                            .provideStaging(runtimeContext, executionTrace, cloudKeeperEnvironment.getInstanceProvider());
+                            .provideStaging(
+                                runtimeContext, executionTrace, cloudKeeperEnvironment.getInstanceProvider()
+                            );
                         return new RuntimeState(runtimeContext, stagingArea);
                     }
                 }, executionContext);

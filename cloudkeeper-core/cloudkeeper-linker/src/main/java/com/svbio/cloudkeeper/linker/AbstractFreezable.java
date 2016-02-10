@@ -126,8 +126,8 @@ abstract class AbstractFreezable {
     /**
      * Resolves the ports in all {@link ProxyModuleImpl} and {@link ConnectionImpl} instances.
      *
-     * <p>Just the {@link #finish(FinishContext)} method is not enough for the following reason. We need to make two passes
-     * over our descendants: First, add ports to all {@link ProxyModuleImpl} instances. Only then, we can finish
+     * <p>Just the {@link #finish(FinishContext)} method is not enough for the following reason. We need to make two
+     * passes over our descendants: First, add ports to all {@link ProxyModuleImpl} instances. Only then, we can finish
      * construction. Otherwise, we run into a cyclic dependency:
      * <ul><li>
      *     (a) determine apply-to-all connections in proxy module ->
@@ -212,7 +212,7 @@ abstract class AbstractFreezable {
     }
 
     @FunctionalInterface
-    interface KeyExtractor<T,K> {
+    interface KeyExtractor<T, K> {
         K apply(T original);
     }
 

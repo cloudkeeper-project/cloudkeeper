@@ -80,7 +80,7 @@ final class DSLAnnotation implements BareAnnotation, Immutable {
         Serializable methodResult;
         try {
             methodResult = (Serializable) method.invoke(annotation);
-        } catch (IllegalAccessException|InvocationTargetException exception) {
+        } catch (IllegalAccessException | InvocationTargetException exception) {
             throw new DSLException(
                 String.format("Cannot convert annotation %s to a CloudKeeper annotation.", annotation),
                 exception,

@@ -89,8 +89,8 @@ enum DefaultInterpreterPropsProvider implements InterpreterPropsProvider {
                 public Creator<UntypedActor> visit(RuntimeCompositeModule compositeModule, @Nullable Void ignored) {
                     requireEmptyExecutionTraceOrModuleType(stagingArea.getAnnotatedExecutionTrace());
                     return new CompositeModuleInterpreterActor.Factory(interpreterProperties, stagingArea,
-                        DefaultInterpreterPropsProvider.this, moduleId, localInPortsHasValueList, recomputedInPortsClone,
-                        requestedOutPortsClone);
+                        DefaultInterpreterPropsProvider.this, moduleId, localInPortsHasValueList,
+                        recomputedInPortsClone, requestedOutPortsClone);
                 }
 
                 @Override
@@ -99,7 +99,8 @@ enum DefaultInterpreterPropsProvider implements InterpreterPropsProvider {
                     RuntimeExecutionTrace executionTrace = stagingArea.getAnnotatedExecutionTrace();
                     if (executionTrace.isEmpty() || executionTrace.getType() != RuntimeExecutionTrace.Type.ITERATION) {
                         return new LoopModuleInterpreterActor.Factory(interpreterProperties, stagingArea,
-                            DefaultInterpreterPropsProvider.this, moduleId, recomputedInPortsClone, requestedOutPortsClone);
+                            DefaultInterpreterPropsProvider.this, moduleId, recomputedInPortsClone,
+                            requestedOutPortsClone);
                     } else {
                         return new CompositeModuleInterpreterActor.Factory(interpreterProperties, stagingArea,
                             DefaultInterpreterPropsProvider.this, 0, localInPortsHasValueList, recomputedInPortsClone,

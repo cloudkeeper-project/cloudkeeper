@@ -104,7 +104,8 @@ final class MasterInterpreterActor extends UntypedActor {
         } else if (message instanceof MasterInterpreterActorInterface.StartExecution) {
             startExecution(((MasterInterpreterActorInterface.StartExecution) message).getExecutionId());
         } else if (message instanceof MasterInterpreterActorInterface.CancelWorkflow) {
-            MasterInterpreterActorInterface.CancelWorkflow arguments = (MasterInterpreterActorInterface.CancelWorkflow) message;
+            MasterInterpreterActorInterface.CancelWorkflow arguments
+                = (MasterInterpreterActorInterface.CancelWorkflow) message;
             cancel(arguments.getExecutionId(), arguments.getThrowable());
         } else if (message instanceof Terminated) {
             terminated(((Terminated) message).getActor());

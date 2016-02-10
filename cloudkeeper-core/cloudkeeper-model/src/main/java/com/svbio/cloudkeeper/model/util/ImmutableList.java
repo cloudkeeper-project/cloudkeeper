@@ -148,7 +148,7 @@ public abstract class ImmutableList<E> extends AbstractList<E> implements Serial
 
         private static final ImmutableList<?> INSTANCE = new EmptyList<>();
 
-        private static final Object[] EMPTY_ARRAY = { };
+        private static final Object[] EMPTY_ARRAY = {};
 
         private Object readResolve() throws ObjectStreamException {
             return INSTANCE;

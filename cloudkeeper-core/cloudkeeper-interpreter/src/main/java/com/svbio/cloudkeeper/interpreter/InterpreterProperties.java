@@ -43,7 +43,9 @@ class InterpreterProperties implements Serializable {
         return cleaningRequested;
     }
 
-    ActorRef getAdministrator() { return administrator; }
+    ActorRef getAdministrator() {
+        return administrator;
+    }
 
     ActorRef getExecutor() {
         return executor;

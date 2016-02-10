@@ -395,7 +395,7 @@ public final class CompileBundleMojo extends AbstractMojo {
         return ImmutableList.copyOf(visitor.classNames);
     }
 
-    private static class BuildOutputFileVisitor extends SimpleFileVisitor<Path> {
+    private static final class BuildOutputFileVisitor extends SimpleFileVisitor<Path> {
         private final Logger log = LoggerFactory.getLogger(getClass());
         private final List<String> classNames = new ArrayList<>();
         private final Path basePath;
@@ -438,7 +438,7 @@ public final class CompileBundleMojo extends AbstractMojo {
         }
     }
 
-    private static class RelevantAnnotationTypesClassVisitor extends ClassVisitor {
+    private static final class RelevantAnnotationTypesClassVisitor extends ClassVisitor {
         private final List<Class<? extends Annotation>> relevantAnnotationTypes = new ArrayList<>();
 
         private RelevantAnnotationTypesClassVisitor() {

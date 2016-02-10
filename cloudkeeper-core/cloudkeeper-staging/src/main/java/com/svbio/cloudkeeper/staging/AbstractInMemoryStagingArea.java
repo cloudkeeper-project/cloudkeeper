@@ -136,7 +136,7 @@ public abstract class AbstractInMemoryStagingArea extends AbstractStagingArea {
     protected final void putSerializationTree(RuntimeExecutionTrace target,
             RuntimeAnnotatedExecutionTrace absoluteTarget, RuntimeSerializationRoot serializationTree)
             throws IOException {
-        ObjectNode sourceTree = marshalingTree (serializationTree);
+        ObjectNode sourceTree = marshalingTree(serializationTree);
         ObjectNode tree = MarshalingTreeBuilder.processMarshalingTree(
             sourceTree, marshalers(absoluteTarget), (path, marshaler, currentObject) -> true);
         tree.accept(StoreVisitor.INSTANCE, getNodeContext(target, absoluteTarget));

@@ -123,7 +123,7 @@ public final class ModuleFactory {
             return (Class<? extends T>) proxyClassLoader.loadClass(
                 ProxyClassLoader.getProxyNameFromName(moduleClass.getName())
             );
-        } catch (IOException|ClassNotFoundException exception) {
+        } catch (IOException | ClassNotFoundException exception) {
             // Unexpected for the following reasons:
             // - An IOException means that the class file for moduleClass could not be read.
             // - A ClassNotFoundException means that defineProxyForClass() succeeded, so a ClassNotFoundException

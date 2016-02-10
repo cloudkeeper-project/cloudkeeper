@@ -144,7 +144,7 @@ public final class SingleVMCloudKeeper {
                     actualWorkspaceBasePath);
                 success = true;
                 return cloudKeeper;
-            } catch (IOException|BuilderException exception) {
+            } catch (IOException | BuilderException exception) {
                 throw new BuilderException(SingleVMCloudKeeper.class.toString(), exception);
             } finally {
                 if (!success) {

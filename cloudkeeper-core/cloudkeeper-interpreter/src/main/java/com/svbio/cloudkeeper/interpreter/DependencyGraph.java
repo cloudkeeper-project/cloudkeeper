@@ -530,7 +530,9 @@ final class DependencyGraph {
         }
 
         @Override
-        RuntimeModule getElement() { return submodule; }
+        RuntimeModule getElement() {
+            return submodule;
+        }
 
         @Override
         HasValue getHasValue() {

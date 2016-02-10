@@ -99,7 +99,7 @@ final class AnnotationImpl extends LocatableImpl implements RuntimeAnnotation {
         if (localAnnotation == null || !localAnnotation.getClass().equals(annotationClass)) {
             localAnnotation = (Annotation) Proxy.newProxyInstance(
                 annotationClass.getClassLoader(),
-                new Class<?>[]{ annotationClass },
+                new Class<?>[] {annotationClass},
                 new AnnotationInvocationHandler(annotationClass)
             );
             javaAnnotation = localAnnotation;
@@ -164,7 +164,7 @@ final class AnnotationImpl extends LocatableImpl implements RuntimeAnnotation {
                         }
                     }
                 }
-            } catch (IllegalAccessException|InvocationTargetException ignored) {
+            } catch (IllegalAccessException | InvocationTargetException ignored) {
                 return false;
             }
             return true;

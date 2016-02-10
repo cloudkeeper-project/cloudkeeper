@@ -385,7 +385,7 @@ public abstract class ExecutionTrace implements RuntimeExecutionTrace, Serializa
         }
 
         @Override
-        public final Type getType() {
+        public Type getType() {
             throw new IndexOutOfBoundsException("getType() called for empty execution trace.");
         }
 
@@ -395,22 +395,22 @@ public abstract class ExecutionTrace implements RuntimeExecutionTrace, Serializa
         }
 
         @Override
-        public final SimpleName getSimpleName() {
+        public SimpleName getSimpleName() {
             throw new IndexOutOfBoundsException("getSimpleName() called for empty execution trace.");
         }
 
         @Override
-        public final Index getIndex() {
+        public Index getIndex() {
             throw new IndexOutOfBoundsException("getIndex() called for empty execution trace.");
         }
 
         @Override
-        public final ExecutionTrace getFrames() {
+        public ExecutionTrace getFrames() {
             return this;
         }
 
         @Override
-        public final ExecutionTrace getReference() {
+        public ExecutionTrace getReference() {
             return this;
         }
 
@@ -445,7 +445,7 @@ public abstract class ExecutionTrace implements RuntimeExecutionTrace, Serializa
         }
 
         @Override
-        public final ExecutionTrace subtrace(int beginIndex, int endIndex) {
+        public ExecutionTrace subtrace(int beginIndex, int endIndex) {
             requireValidSubtraceArguments(beginIndex, endIndex, 0);
             return this;
         }
@@ -560,12 +560,12 @@ public abstract class ExecutionTrace implements RuntimeExecutionTrace, Serializa
         }
 
         @Override
-        public final Type getType() {
+        public Type getType() {
             return type;
         }
 
         @Override
-        public final ExecutionTrace getFrames() {
+        public ExecutionTrace getFrames() {
             return CALL_STACK_TYPES.contains(type)
                 ? this
                 : EmptyExecutionTrace.INSTANCE;

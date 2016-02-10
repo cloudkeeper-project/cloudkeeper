@@ -26,14 +26,14 @@ public final class StringMarshaler implements Marshaler<String> {
     }
 
     @Override
-    public final void put(String string, MarshalContext context) throws IOException {
+    public void put(String string, MarshalContext context) throws IOException {
         try (OutputStream outputStream = context.newOutputStream(NoKey.instance())) {
             outputStream.write(string.getBytes(StandardCharsets.UTF_8));
         }
     }
 
     @Override
-    public final String get(UnmarshalContext context) throws IOException {
+    public String get(UnmarshalContext context) throws IOException {
         StringBuilder stringBuilder = new StringBuilder(BUFFER_SIZE);
         byte[] buffer = new byte[BUFFER_SIZE];
         try (InputStream inputStream = context.getByteSequence(NoKey.instance()).newInputStream()) {

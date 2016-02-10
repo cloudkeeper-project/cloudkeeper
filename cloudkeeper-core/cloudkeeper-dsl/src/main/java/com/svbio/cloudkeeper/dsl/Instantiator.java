@@ -14,12 +14,12 @@ final class Instantiator {
 
     static <T> T instantiate(Class<T> clazz) throws DSLException {
         if (
-            (clazz.isMemberClass() && !Modifier.isStatic(clazz.getModifiers())) ||
-            clazz.isAnonymousClass() ||
-            clazz.isLocalClass()
+            (clazz.isMemberClass() && !Modifier.isStatic(clazz.getModifiers()))
+                || clazz.isAnonymousClass()
+                || clazz.isLocalClass()
         ) {
-            throw new CannotInstantiateException(String.format("Cannot instantiate %s, because it is an inner, " +
-                "nested, or anonymous class.", clazz), null);
+            throw new CannotInstantiateException(String.format("Cannot instantiate %s, because it is an inner, "
+                + "nested, or anonymous class.", clazz), null);
         }
 
         final Constructor<T> constructor;
@@ -53,8 +53,8 @@ final class Instantiator {
             }
 
             throw new CannotInstantiateException(
-                String.format("Cannot instantiate %s because the public no-argument constructor threw an " +
-                    "exception.", clazz),
+                String.format("Cannot instantiate %s because the public no-argument constructor threw an "
+                    + "exception.", clazz),
                 exception.getCause(),
                 null
             );

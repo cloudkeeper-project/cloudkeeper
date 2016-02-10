@@ -20,7 +20,7 @@ public interface RuntimeTypeMirror extends BareTypeMirror, TypeMirror, Immutable
      *
      * @see javax.lang.model.util.Types#isSubtype(TypeMirror, TypeMirror)
      */
-    boolean	isLinkableFrom(RuntimeTypeMirror type);
+    boolean isLinkableFrom(RuntimeTypeMirror type);
 
     /**
      * Returns a list of type declarations (transitively) referenced by this type.

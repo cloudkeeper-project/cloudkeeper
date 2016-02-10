@@ -62,10 +62,9 @@ final class ProxyClassLoader extends ClassLoader {
             }
 
             MethodIdentifier other = (MethodIdentifier) otherObject;
-            return
-                classInternalName.equals(other.classInternalName) &&
-                methodName.equals(other.methodName) &&
-                descriptor.equals(other.descriptor);
+            return classInternalName.equals(other.classInternalName)
+                && methodName.equals(other.methodName)
+                && descriptor.equals(other.descriptor);
         }
 
         @Override
@@ -142,8 +141,8 @@ final class ProxyClassLoader extends ClassLoader {
             String[] exceptions) {
 
             if (
-                name != null && descriptor != null &&
-                relevantMethods.contains(new MethodIdentifier(visitedClassInternalName, name, descriptor))
+                name != null && descriptor != null
+                && relevantMethods.contains(new MethodIdentifier(visitedClassInternalName, name, descriptor))
             ) {
                 // Create method. Since we are overriding, we can reuse almost all arguments.
                 MethodVisitor methodVisitor = classWriter.visitMethod(
@@ -228,8 +227,8 @@ final class ProxyClassLoader extends ClassLoader {
             // getMethods() only return public methods.
             int modifiers = method.getModifiers();
             if (
-                proxyMethod.getReturnType().isAssignableFrom(method.getReturnType()) &&
-                Modifier.isAbstract(modifiers)
+                proxyMethod.getReturnType().isAssignableFrom(method.getReturnType())
+                && Modifier.isAbstract(modifiers)
             ) {
                 Class<?> declaringClass = method.getDeclaringClass();
                 Set<MethodIdentifier> relevantMethodsForClass = relevantMethods.get(declaringClass);
@@ -274,8 +273,8 @@ final class ProxyClassLoader extends ClassLoader {
             Class<?> clazz = dynamicClasses.get(name);
             if (clazz == null) {
                 // defineProxyForClass() needs to be called first before this method can succeed!
-                throw new ClassNotFoundException(String.format("Could not find dynamically generated class %s " +
-                    "(for abstract class %s).", name, getNameFromProxyName(name)));
+                throw new ClassNotFoundException(String.format("Could not find dynamically generated class %s "
+                    + "(for abstract class %s).", name, getNameFromProxyName(name)));
             }
             return clazz;
         }

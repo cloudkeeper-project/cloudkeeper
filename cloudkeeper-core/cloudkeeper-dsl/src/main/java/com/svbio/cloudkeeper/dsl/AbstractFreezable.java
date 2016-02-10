@@ -26,8 +26,8 @@ abstract class AbstractFreezable {
      */
     final void requireFrozen() {
         if (!frozen) {
-            throw new IllegalStateException(String.format("Tried to access instance of %s for information that is " +
-                "only available after the instance has been made immutable.", getClass()));
+            throw new IllegalStateException(String.format("Tried to access instance of %s for information that is "
+                + "only available after the instance has been made immutable.", getClass()));
         }
     }
 

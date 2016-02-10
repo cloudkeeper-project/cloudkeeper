@@ -60,8 +60,8 @@ public abstract class AbstractStagingArea implements StagingArea {
      */
     private static void requireRelativeTraceWithReference(RuntimeExecutionTrace trace) {
         if (trace.getReference().isEmpty()) {
-            throw new IllegalArgumentException(String.format("Expected relative trace with non-empty reference, " +
-                "but got %s.", trace));
+            throw new IllegalArgumentException(String.format("Expected relative trace with non-empty reference, "
+                + "but got %s.", trace));
         }
     }
 
@@ -335,8 +335,8 @@ public abstract class AbstractStagingArea implements StagingArea {
     @Override
     public final AbstractStagingArea resolveDescendant(RuntimeExecutionTrace trace) {
         if (!trace.getReference().isEmpty()) {
-            throw new IllegalArgumentException(String.format("Expected relative trace with empty reference, " +
-                "but got %s.", trace));
+            throw new IllegalArgumentException(String.format("Expected relative trace with empty reference, "
+                + "but got %s.", trace));
         }
         RuntimeAnnotatedExecutionTrace absoluteTrace = executionTrace.resolveExecutionTrace(trace);
 
@@ -412,7 +412,7 @@ public abstract class AbstractStagingArea implements StagingArea {
         }
     }
 
-    private static class MarshaledObjectNodeImpl implements MarshaledObjectNode {
+    private static final class MarshaledObjectNodeImpl implements MarshaledObjectNode {
         private final RuntimeSerializationRoot originalNode;
 
         private MarshaledObjectNodeImpl(RuntimeSerializationRoot originalNode) {
@@ -434,7 +434,7 @@ public abstract class AbstractStagingArea implements StagingArea {
         }
     }
 
-    private static class MarshaledReplacementObjectNodeImpl implements MarshaledReplacementObjectNode {
+    private static final class MarshaledReplacementObjectNodeImpl implements MarshaledReplacementObjectNode {
         private final RuntimeSerializationRoot originalNode;
 
         private MarshaledReplacementObjectNodeImpl(RuntimeSerializationRoot originalNode) {
@@ -456,7 +456,7 @@ public abstract class AbstractStagingArea implements StagingArea {
         }
     }
 
-    private static class RawObjectNodeImpl implements RawObjectNode {
+    private static final class RawObjectNodeImpl implements RawObjectNode {
         private final RuntimeSerializedString originalNode;
 
         private RawObjectNodeImpl(RuntimeSerializedString originalNode) {
@@ -475,7 +475,7 @@ public abstract class AbstractStagingArea implements StagingArea {
         }
     }
 
-    private static class ByteSequenceNodeImpl implements ByteSequenceNode {
+    private static final class ByteSequenceNodeImpl implements ByteSequenceNode {
         private final RuntimeByteSequence originalNode;
 
         private ByteSequenceNodeImpl(RuntimeByteSequence originalNode) {

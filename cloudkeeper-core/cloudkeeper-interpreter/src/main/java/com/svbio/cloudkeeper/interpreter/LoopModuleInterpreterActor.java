@@ -85,8 +85,8 @@ final class LoopModuleInterpreterActor extends AbstractModuleInterpreterActor {
     /**
      * Set of all in-ports for which this actor received an {@link InterpreterInterface.InPortHasSignal} message
      * (handled in {@link #inPortHasSignal(int)}) and then subsequently copied the input to the execution trace
-     * corresponding to the first iteration (see {@link #copiedInPortToFirstIteration(int)}), all while the iteration child
-     * actor had not yet been started by {@link #startChildExecutor(Index)}.
+     * corresponding to the first iteration (see {@link #copiedInPortToFirstIteration(int)}), all while the iteration
+     * child actor had not yet been started by {@link #startChildExecutor(Index)}.
      */
     private final BitSet inPortsCopiedToFirstIteration;
 

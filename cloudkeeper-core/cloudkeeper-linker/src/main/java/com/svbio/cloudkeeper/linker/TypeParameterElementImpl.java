@@ -119,7 +119,7 @@ final class TypeParameterElementImpl
     }
 
     @Override
-    protected final void collectEnclosedByAnnotatedConstruct(
+    protected void collectEnclosedByAnnotatedConstruct(
         Collection<AbstractFreezable> freezables) {
         freezables.addAll(bounds);
     }

@@ -113,27 +113,27 @@ public final class MarshalingTreeBuilder implements TreeBuilder<MarshalingTreeNo
     }
 
     @Override
-    public final RawObjectNode createObjectNode(Marshaler<?> marshaler, Object object) {
+    public RawObjectNode createObjectNode(Marshaler<?> marshaler, Object object) {
         return new RawObjectNodeImpl(marshaler, object);
     }
 
     @Override
-    public final ByteSequenceNode createByteSequenceNode(ByteSequence byteSequence) {
+    public ByteSequenceNode createByteSequenceNode(ByteSequence byteSequence) {
         return new ByteSequenceNodeImpl(byteSequence);
     }
 
     @Override
-    public final MarshaledReplacementObjectNode createRedirectNode(Marshaler<?> marshaler, MarshalingTreeNode child) {
+    public MarshaledReplacementObjectNode createRedirectNode(Marshaler<?> marshaler, MarshalingTreeNode child) {
         return new MarshaledAsReplacementObjectNodeImpl(marshaler, child);
     }
 
     @Override
-    public final MarshaledObjectNode createParentNode(Marshaler<?> marshaler, Map<Key, MarshalingTreeNode> children) {
+    public MarshaledObjectNode createParentNode(Marshaler<?> marshaler, Map<Key, MarshalingTreeNode> children) {
         return new MarshaledAsObjectNodeImpl(marshaler, children);
     }
 
     @Override
-    public final MarshalingTreeBuilder resolve(Key key) {
+    public MarshalingTreeBuilder resolve(Key key) {
         List<Key> childPath = new ArrayList<>(path.size() + 1);
         childPath.addAll(path);
         childPath.add(key);

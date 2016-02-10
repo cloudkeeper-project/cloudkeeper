@@ -142,7 +142,7 @@ final class SimpleModuleDeclarationImpl extends ModuleDeclarationImpl implements
     }
 
     @Override
-    final void finishFreezable(FinishContext context) throws LinkerException {
+    void finishFreezable(FinishContext context) throws LinkerException {
         mutablePorts = null;
         executable = context.getExecutable(this);
     }

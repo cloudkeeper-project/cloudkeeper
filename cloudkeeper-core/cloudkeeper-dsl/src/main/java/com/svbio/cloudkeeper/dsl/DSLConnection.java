@@ -176,8 +176,8 @@ abstract class DSLConnection implements BareConnection, Immutable {
         }
         if (filter == null) {
             throw new ConnectionException(String.format(
-                "Cannot connect %s to %s because the topological relationship is neither a sibling, parent-to-child, " +
-                "child-to-parent, nor short-circuit connection.", fromConnectable, toConnectable
+                "Cannot connect %s to %s because the topological relationship is neither a sibling, parent-to-child, "
+                    + "child-to-parent, nor short-circuit connection.", fromConnectable, toConnectable
             ), location);
         } else {
             return null;

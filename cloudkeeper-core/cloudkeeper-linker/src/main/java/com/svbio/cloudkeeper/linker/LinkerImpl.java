@@ -99,7 +99,9 @@ final class LinkerImpl extends AbstractFreezable {
         return repository;
     }
 
-    CloudKeeperTypeReflection getTypes() { return typeReflection; }
+    CloudKeeperTypeReflection getTypes() {
+        return typeReflection;
+    }
 
     ImmutableList<SerializationDeclarationImpl> getDefaultSerializationDeclarations() {
         return defaultSerializationDeclarations;

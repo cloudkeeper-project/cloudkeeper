@@ -22,6 +22,10 @@ import static java.util.Objects.requireNonNull;
  * practices.
  */
 final class Fields {
+    private Fields() {
+        throw new AssertionError(String.format("No %s instances for you!", getClass().getName()));
+    }
+
     /**
      * Returns an iterator over all fields declared in the given class, including superclasses up to the given upper
      * bound.
@@ -46,7 +50,7 @@ final class Fields {
 
             fields.addAll(Arrays.asList(declaredFields));
 
-            @SuppressWarnings({ "unchecked","UnnecessaryLocalVariable" })
+            @SuppressWarnings({ "unchecked", "UnnecessaryLocalVariable" })
             Class<? extends T> superclass = (Class<? extends T>) currentClass.getSuperclass();
             currentClass = superclass;
         }
@@ -78,9 +82,9 @@ final class Fields {
             try {
                 reference = field.get(object);
             } catch (IllegalAccessException exception) {
-                throw new IllegalStateException(String.format("Could not access field %s, even though " +
-                    "AccessibleField#setAccessible(true) was called.",
-                    field), exception);
+                throw new IllegalStateException(String.format(
+                    "Could not access field %s, even though AccessibleField#setAccessible(true) was called.", field
+                ), exception);
             }
             if (reference == value) {
                 fieldsWithReferenceToValue.add(field);
@@ -103,13 +107,13 @@ final class Fields {
         try {
             return field.get(object);
         } catch (IllegalAccessException exception) {
-            throw new IllegalStateException(String.format("Could not access field %s, even though " +
-                "AccessibleField#setAccessible(true) was called.",
-                field), exception);
+            throw new IllegalStateException(String.format(
+                "Could not access field %s, even though AccessibleField#setAccessible(true) was called.", field
+            ), exception);
         }
     }
 
-    private static class FilteredFieldIterator<T extends U, U> implements Iterator<Field> {
+    private static final class FilteredFieldIterator<T extends U, U> implements Iterator<Field> {
         private final T object;
         private final Class<?> clazz;
         private final Iterator<Field> iterator;
@@ -129,9 +133,10 @@ final class Fields {
             try {
                 return currentField.get(object);
             } catch (IllegalAccessException exception) {
-                throw new AssertionError(String.format("Could not access field %s, even though " +
-                    "AccessibleField#setAccessible(true) was called.",
-                    currentField), exception);
+                throw new AssertionError(String.format(
+                    "Could not access field %s, even though AccessibleField#setAccessible(true) was called.",
+                    currentField
+                ), exception);
             }
         }
 
@@ -174,7 +179,7 @@ final class Fields {
         }
     }
 
-    private static class FilteredIterator<T extends U, U, V> implements Iterator<V> {
+    private static final class FilteredIterator<T extends U, U, V> implements Iterator<V> {
         private final FilteredFieldIterator<T, U> fieldIterator;
 
         private FilteredIterator(T object, Class<U> upperBound, Class<V> clazz) {
@@ -192,7 +197,7 @@ final class Fields {
                 throw new NoSuchElementException();
             }
             Field currentField = fieldIterator.next();
-            @SuppressWarnings({ "unchecked","UnnecessaryLocalVariable" })
+            @SuppressWarnings({ "unchecked", "UnnecessaryLocalVariable" })
             V valueOfCurrentField = (V) valueOfField(fieldIterator.object, currentField);
             return valueOfCurrentField;
         }

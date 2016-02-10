@@ -2,6 +2,7 @@ package com.svbio.cloudkeeper.model.util;
 
 import com.svbio.cloudkeeper.model.immutable.element.Version;
 
+import javax.annotation.Nullable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
@@ -23,10 +24,10 @@ public final class BuildInformation {
     }
 
     private static String getProperty(Properties properties, String key) {
-        String value = properties.getProperty(key);
+        @Nullable String value = properties.getProperty(key);
         if (value == null) {
-            throw new AssertionError(String.format("Expected property %s to be non-null. " +
-                "This may indicated file corruption.", key));
+            throw new AssertionError(String.format("Expected property %s to be non-null. "
+                + "This may indicated file corruption.", key));
         }
         return value;
     }

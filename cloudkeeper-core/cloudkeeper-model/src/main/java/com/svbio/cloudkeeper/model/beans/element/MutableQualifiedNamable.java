@@ -51,7 +51,7 @@ public final class MutableQualifiedNamable
     }
 
     @Override
-    public final String toString() {
+    public String toString() {
         return Default.toString(this);
     }
 

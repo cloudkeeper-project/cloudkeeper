@@ -80,7 +80,7 @@ final class PackageImpl extends AnnotatedConstructImpl implements RuntimePackage
     }
 
     @Override
-    public final URI getBundleIdentifier() {
+    public URI getBundleIdentifier() {
         require(State.FINISHED);
         @Nullable URI localBundleIdentifier = bundleIdentifier;
         assert localBundleIdentifier != null : "must be non-null when finished";

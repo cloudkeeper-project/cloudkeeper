@@ -100,7 +100,7 @@ public final class MutableAnnotation extends MutableLocatable<MutableAnnotation>
         AnnotationValue value;
         try {
             methodResult = method.invoke(annotation);
-        } catch (IllegalAccessException|InvocationTargetException exception) {
+        } catch (IllegalAccessException | InvocationTargetException exception) {
             throw new IllegalArgumentException(
                 String.format("Cannot convert annotation %s to a CloudKeeper annotation.", annotation),
                 exception

@@ -88,7 +88,7 @@ public final class ScalaFutures {
         );
     }
 
-    private static class WrappedException extends RuntimeException {
+    private static final class WrappedException extends RuntimeException {
         private static final long serialVersionUID = -5551087075125052070L;
 
         private WrappedException(Throwable cause) {

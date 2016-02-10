@@ -77,7 +77,7 @@ final class AetherConnector {
      * @throws NullPointerException if {@code unresolvedArtifact} is {@code null}
      * @throws RepositoryException if one or more artifacts cannot be resolved
      */
-    public final List<Artifact> resolveArtifacts(@Nullable DependencyFilter dependencyFilter,
+    public List<Artifact> resolveArtifacts(@Nullable DependencyFilter dependencyFilter,
             List<Artifact> unresolvedArtifacts, @Nullable String scope) throws RepositoryException {
         List<Dependency> dependencies = unresolvedArtifacts.stream()
             .map(unresolved -> new Dependency(unresolved, scope))

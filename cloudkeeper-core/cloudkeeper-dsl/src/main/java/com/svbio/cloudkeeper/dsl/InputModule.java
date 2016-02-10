@@ -82,8 +82,8 @@ public final class InputModule<T> extends Module<InputModule<T>> implements Bare
             Type javaType;
             // We need to determine the port type of this input module.
             if (
-                declaredType instanceof ParameterizedType &&
-                ((ParameterizedType) declaredType).getRawType().equals(InputModule.class)
+                declaredType instanceof ParameterizedType
+                    && ((ParameterizedType) declaredType).getRawType().equals(InputModule.class)
             ) {
                 // If this input module is not anonymous, we take the declared type as type (that is, the type parameter
                 // given to InputModule).
@@ -93,8 +93,8 @@ public final class InputModule<T> extends Module<InputModule<T>> implements Bare
                 // we take that.
                 javaType = value.getClass();
             } else {
-                throw new InvalidTypeException(String.format("Cannot determine static type of input module %s. " +
-                    "Expected %s but got %s.", simpleName, InputModule.class, declaredType), getLocation());
+                throw new InvalidTypeException(String.format("Cannot determine static type of input module %s. "
+                    + "Expected %s but got %s.", simpleName, InputModule.class, declaredType), getLocation());
             }
             outPort.setJavaType(javaType);
         }

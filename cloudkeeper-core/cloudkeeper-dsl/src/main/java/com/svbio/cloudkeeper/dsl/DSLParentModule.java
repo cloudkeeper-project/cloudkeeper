@@ -71,9 +71,8 @@ abstract class DSLParentModule<D extends DSLParentModule<D>> extends Module<D> i
             }
 
             ValueAndType<?> other = (ValueAndType<?>) otherObject;
-            return
-                value.equals(other.value) &&
-                Objects.equals(staticType, other.staticType);
+            return value.equals(other.value)
+                && Objects.equals(staticType, other.staticType);
         }
 
         @Override
@@ -181,8 +180,8 @@ abstract class DSLParentModule<D extends DSLParentModule<D>> extends Module<D> i
      * That is, if the current module has a {@link CompositeModulePlugin} annotation), it may create a child that
      * directly or indirectly creates a child of the same type as the current module.
      *
-     * Recursion in an anonymous module will also be detected, and a {@link AnonymousRecursionException} exception will be
-     * thrown.
+     * Recursion in an anonymous module will also be detected, and a {@link AnonymousRecursionException} exception will
+     * be thrown.
      *
      * Internally, recursion is resolved by scanning through the "creation stack" induced by this method, and returning
      * the last occurrence of the same module class.

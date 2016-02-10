@@ -79,7 +79,7 @@ public final class SystemBundle {
      * Returns a new mutable (not linked) system repository.
      */
     public static MutableBundle newSystemBundle() {
-        CopyOption[] copyOptions = { CopyOptions.INSTANCE };
+        CopyOption[] copyOptions = {CopyOptions.INSTANCE};
         return new MutableBundle()
             .setBundleIdentifier(SYSTEM_BUNDLE_IDENTIFIER)
             .setPackages(Arrays.asList(

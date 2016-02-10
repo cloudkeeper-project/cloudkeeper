@@ -15,7 +15,7 @@ import java.util.Objects;
  * <p>An instance of this class provides the {@link Class} instances (as specified by the DSL) that make up a
  * CloudKeeper plug-in declaration.
  */
-public class DSLPluginDescriptor {
+public final class DSLPluginDescriptor {
     /**
      * Prefix of mix-in classes that provide annotations.
      */

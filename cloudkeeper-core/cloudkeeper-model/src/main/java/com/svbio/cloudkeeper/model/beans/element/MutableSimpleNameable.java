@@ -49,7 +49,7 @@ public final class MutableSimpleNameable extends MutableLocatable<MutableSimpleN
     }
 
     @Override
-    public final String toString() {
+    public String toString() {
         return Default.toString(this);
     }
 

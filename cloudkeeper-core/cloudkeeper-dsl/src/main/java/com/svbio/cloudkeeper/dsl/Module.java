@@ -149,9 +149,9 @@ public abstract class Module<D extends Module<D>> extends AbstractFreezable impl
         for (Method method: getModuleClass().getMethods()) {
             Class<?> portClass = method.getReturnType();
             if (
-                Modifier.isAbstract(method.getModifiers()) &&
-                method.getParameterTypes().length == 0 &&
-                Port.class.isAssignableFrom(portClass)
+                Modifier.isAbstract(method.getModifiers())
+                    && method.getParameterTypes().length == 0
+                    && Port.class.isAssignableFrom(portClass)
             ) {
                 Type type = method.getGenericReturnType();
                 @Nullable Type typeParameter = null;

@@ -124,7 +124,7 @@ final class AnnotationTypeElementImpl
     }
 
     @Override
-    final void collectEnclosedByAnnotatedConstruct(Collection<AbstractFreezable> freezables) {
+    void collectEnclosedByAnnotatedConstruct(Collection<AbstractFreezable> freezables) {
         freezables.add(returnType);
         if (typeOfDefaultValue != null) {
             freezables.add(typeOfDefaultValue);

@@ -235,8 +235,10 @@ abstract class ConnectionImpl extends LocatableImpl implements RuntimeConnection
         private ChildOutToParentOut(BareChildOutToParentOutConnection original,
             CopyContext parentContext, int index) throws LinkerException {
             super(original, parentContext, index);
-            fromModuleReference
-                = new SimpleNameReference(original.getFromModule(), getCopyContext().newContextForProperty("fromModule"));
+            fromModuleReference = new SimpleNameReference(
+                original.getFromModule(),
+                getCopyContext().newContextForProperty("fromModule")
+            );
         }
 
         @Override

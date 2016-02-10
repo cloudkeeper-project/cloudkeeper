@@ -227,8 +227,8 @@ public final class CharacterStreamCommunication {
      * <p>This method is meant to be used on the receiving side of a channel that was previously written to using method
      * {@link #writeObject(Serializable, Appendable, String)}. While MIME headers are expected, only the combination of
      * {@code content-type} and {@code content-transfer-encoding} chosen by
-     * {@link #writeObject(Serializable, Appendable, String)} is supported by this method. Deviations from this will result in
-     * an {@link IOException}.
+     * {@link #writeObject(Serializable, Appendable, String)} is supported by this method. Deviations from this will
+     * result in an {@link IOException}.
      *
      * <p>Callers of this method are expected to enclose the output of this method in a proper MIME boundary, as
      * specified by <a href="http://tools.ietf.org/html/rfc2046#section-5.1.1">RFC 2046</a>. Upon succesful return, the
