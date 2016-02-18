@@ -14,7 +14,6 @@ import com.svbio.cloudkeeper.model.immutable.element.Name;
 import com.svbio.cloudkeeper.model.immutable.element.SimpleName;
 import com.svbio.cloudkeeper.model.immutable.element.Version;
 import com.svbio.cloudkeeper.model.util.ImmutableList;
-import com.svbio.cloudkeeper.simple.AwaitException;
 import com.svbio.cloudkeeper.simple.DSLExecutableProvider;
 import com.svbio.cloudkeeper.simple.SimpleInstanceProvider;
 import com.svbio.cloudkeeper.simple.SingleVMCloudKeeper;
@@ -33,10 +32,11 @@ import org.eclipse.aether.spi.connector.RepositoryConnectorFactory;
 import org.eclipse.aether.spi.connector.transport.TransporterFactory;
 import org.eclipse.aether.transport.file.FileTransporterFactory;
 import org.eclipse.aether.transport.http.HttpTransporterFactory;
+import scala.concurrent.Await;
 import scala.concurrent.ExecutionContext;
+import scala.concurrent.duration.Duration;
 
 import java.io.BufferedReader;
-import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -44,7 +44,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 public final class ModuleRunner {
@@ -93,8 +92,7 @@ public final class ModuleRunner {
 
     private ModuleRunner() { }
 
-    static String runWithStringInput(Config config, String input)
-            throws AwaitException, TimeoutException, InterruptedException {
+    static String runWithStringInput(Config config, String input) throws Exception {
         Configuration configuration = new Configuration(config.getConfig("com.svbio.cloudkeeper.samples"));
         AetherConfiguration aetherConfiguration = configuration.aetherConfiguration;
         DefaultServiceLocator locator = MavenRepositorySystemUtils.newServiceLocator();
@@ -138,13 +136,12 @@ public final class ModuleRunner {
             workflowExecution, configuration.outPort.toString(), configuration.timeoutSeconds, TimeUnit.SECONDS);
 
         cloudKeeper.shutdown().awaitTermination();
-        actorSystem.shutdown();
-        actorSystem.awaitTermination();
+        Await.result(actorSystem.terminate(), Duration.Inf());
 
         return output;
     }
 
-    public static void main(String[] args) throws IOException, AwaitException, TimeoutException, InterruptedException {
+    public static void main(String[] args) throws Exception {
         Config config = ConfigFactory.load();
         String input;
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8))) {

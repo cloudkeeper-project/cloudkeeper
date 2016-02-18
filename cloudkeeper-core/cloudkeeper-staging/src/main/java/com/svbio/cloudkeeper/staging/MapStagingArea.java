@@ -14,6 +14,7 @@ import com.svbio.cloudkeeper.model.runtime.execution.RuntimeExecutionTrace;
 import scala.concurrent.Future;
 
 import javax.annotation.Nullable;
+import java.io.IOException;
 import java.util.AbstractMap;
 import java.util.AbstractSet;
 import java.util.Iterator;
@@ -81,6 +82,14 @@ public final class MapStagingArea extends AbstractInMemoryStagingArea {
                 objects.subMap(absolutePrefix, lastKey).clear();
             }
         }
+    }
+
+    @Override
+    protected void preWrite(RuntimeExecutionTrace prefix, RuntimeAnnotatedExecutionTrace absolutePrefix)
+            throws IOException {
+        // AbstractStagingArea#delete() expects an execution trace without array indices, but not a problem in the
+        // implementation in this class
+        delete(prefix, absolutePrefix);
     }
 
     @Override

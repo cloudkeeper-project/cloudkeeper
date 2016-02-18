@@ -22,17 +22,17 @@ import javax.annotation.Nullable;
  * {@link IllegalArgumentException},
  * {@link com.svbio.cloudkeeper.model.runtime.execution.IllegalExecutionTraceException}.
  *
- * <p>Implementations of this interface are required to be thread-safe. Moreover, implementations must support the
- * concurrent invocation of staging-area methods provided the calls are <em>consistent</em> (that is,
- * non-contradictory). Invocations are contradictory if
+ * <p>Implementations of this interface are required to be thread-safe. Moreover, if an implementation supports
+ * {@link #getStagingAreaProvider()}, it must also support the concurrent invocation (across multiple JVMs) of
+ * staging-area methods, provided the calls are <em>consistent</em> (that is, non-contradictory). Invocations are
+ * contradictory if
  * <ul><li>
- *     the staging-area instances have a common ancestor with respect to
- *     {@link #resolveDescendant(RuntimeExecutionTrace)} (or are the same) <em>and</em>
+ *     the execution trace for one staging area is a prefix of (or the same as) the execution trace of the other
+ *     <em>and</em>
  * </li><li>
  *     at least one invocation is not {@link #delete(RuntimeExecutionTrace)}.
  * </li></ul>
- * The effect of concurrently invoking staging-area methods that are not consistent is undefined. In particular, this
- * includes running concurrent staging-area operations across multiple JVMs.
+ * The effect of concurrent but inconsistent invocation of staging-area methods is undefined.
  *
  * <p>Even across multiple JVMs, staging areas provide a consistent view if operations are run sequentially (that is, if
  * a staging-area operation on one JVM is only started once no staging-area operation is running on any other JVM any

@@ -99,6 +99,25 @@ public abstract class AbstractStagingArea implements StagingArea {
     protected abstract void delete(RuntimeExecutionTrace prefix, RuntimeAnnotatedExecutionTrace absolutePrefix)
         throws IOException;
 
+    /**
+     * Takes necessary action before writing an object to the given execution trace.
+     *
+     * <p>This method is called (potentially asynchronously) by:
+     * <ul><li>
+     *     {@link #copy(RuntimeExecutionTrace, RuntimeExecutionTrace)}
+     * </li><li>
+     *     {@link #putObject(RuntimeExecutionTrace, Object)}
+     * </li><li>
+     *     {@link #putSerializationTree(RuntimeExecutionTrace, RuntimeSerializationRoot)}
+     * </li></ul>
+     *
+     * @param prefix execution trace prefix with non-empty call stack or non-empty value reference
+     * @param absolutePrefix the result of {@code getAnnotatedExecutionTrace().resolveExecutionTrace(prefix)}
+     * @throws IOException if an I/O error occurs
+     */
+    protected abstract void preWrite(RuntimeExecutionTrace prefix, RuntimeAnnotatedExecutionTrace absolutePrefix)
+        throws IOException;
+
     @Override
     public final Future<RuntimeExecutionTrace> delete(RuntimeExecutionTrace prefix) {
         Objects.requireNonNull(prefix);
@@ -130,7 +149,7 @@ public abstract class AbstractStagingArea implements StagingArea {
      * signature of this method is similar, the requirements are less stringent: In particular, this method is not
      * required to verify arguments (the caller is guaranteed to do that).
      *
-     * <p>It is guaranteed that {@link #delete(RuntimeExecutionTrace, RuntimeAnnotatedExecutionTrace)} has been called
+     * <p>It is guaranteed that {@link #preWrite(RuntimeExecutionTrace, RuntimeAnnotatedExecutionTrace)} has been called
      * immediately before this method.
      *
      * @param source relative source execution trace, {@link RuntimeExecutionTrace#getReference()} is guaranteed
@@ -153,7 +172,7 @@ public abstract class AbstractStagingArea implements StagingArea {
         RuntimeAnnotatedExecutionTrace absoluteTarget = executionTrace.resolveExecutionTrace(target);
 
         return toFuture(() -> {
-            delete(target, absoluteTarget);
+            preWrite(target, absoluteTarget);
             copy(source, target, absoluteSource, absoluteTarget);
             return target;
         }, "copy from %s to %s", absoluteSource, absoluteTarget);
@@ -166,7 +185,7 @@ public abstract class AbstractStagingArea implements StagingArea {
      * this method is similar, the requirements are less stringent: In particular, this method is not required to verify
      * arguments (the caller is guaranteed to do that).
      *
-     * <p>It is guaranteed that {@link #delete(RuntimeExecutionTrace, RuntimeAnnotatedExecutionTrace)} has been called
+     * <p>It is guaranteed that {@link #preWrite(RuntimeExecutionTrace, RuntimeAnnotatedExecutionTrace)} has been called
      * immediately before this method.
      *
      * @param target relative target execution trace, {@link RuntimeExecutionTrace#getReference()} is guaranteed
@@ -185,7 +204,7 @@ public abstract class AbstractStagingArea implements StagingArea {
         RuntimeAnnotatedExecutionTrace absoluteTarget = executionTrace.resolveExecutionTrace(target);
 
         return toFuture(() -> {
-            delete(target, absoluteTarget);
+            preWrite(target, absoluteTarget);
             putObject(target, absoluteTarget, object);
             return target;
         }, "write object at %s", absoluteTarget);
@@ -198,7 +217,7 @@ public abstract class AbstractStagingArea implements StagingArea {
      * this method is similar, the requirements are less stringent: In particular, this method is not required to verify
      * arguments (the caller is guaranteed to do that).
      *
-     * <p>It is guaranteed that {@link #delete(RuntimeExecutionTrace, RuntimeAnnotatedExecutionTrace)} has been called
+     * <p>It is guaranteed that {@link #preWrite(RuntimeExecutionTrace, RuntimeAnnotatedExecutionTrace)} has been called
      * immediately before this method.
      *
      * @param target relative target execution trace, {@link RuntimeExecutionTrace#getReference()} is guaranteed
@@ -219,7 +238,7 @@ public abstract class AbstractStagingArea implements StagingArea {
         RuntimeAnnotatedExecutionTrace absoluteTarget = executionTrace.resolveExecutionTrace(target);
 
         return toFuture(() -> {
-            delete(target, absoluteTarget);
+            preWrite(target, absoluteTarget);
             putSerializationTree(target, absoluteTarget, serializationTree);
             return target;
         }, "write persistence tree at %s", absoluteTarget);

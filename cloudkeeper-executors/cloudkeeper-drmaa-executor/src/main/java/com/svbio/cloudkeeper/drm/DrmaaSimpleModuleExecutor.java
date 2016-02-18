@@ -364,7 +364,7 @@ public final class DrmaaSimpleModuleExecutor implements SimpleModuleExecutor {
         if (localNativeArguments != null) {
             resultBuilder.addProperty(NATIVE_ARGUMENTS, localNativeArguments);
         }
-        @Nullable long localDrmaaSubmissionTimeMillis = timing.drmaaSubmissionTimeMillis;
+        long localDrmaaSubmissionTimeMillis = timing.drmaaSubmissionTimeMillis;
         if (localDrmaaSubmissionTimeMillis != 0) {
             resultBuilder.addProperty(DRMAA_SUBMISSION_TIME_MILLIS, localDrmaaSubmissionTimeMillis);
         }

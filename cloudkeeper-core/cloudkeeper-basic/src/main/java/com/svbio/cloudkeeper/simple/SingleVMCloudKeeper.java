@@ -17,7 +17,9 @@ import com.svbio.cloudkeeper.model.api.util.RecursiveDeleteVisitor;
 import com.svbio.cloudkeeper.staging.MapStagingArea;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import scala.concurrent.Await;
 import scala.concurrent.ExecutionContext;
+import scala.concurrent.duration.Duration;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -163,14 +165,17 @@ public final class SingleVMCloudKeeper {
         @Override
         public void run() {
             if (ownsActorSystem) {
-                actorSystem.shutdown();
-                actorSystem.awaitTermination();
+                try {
+                    Await.result(actorSystem.terminate(), Duration.Inf());
+                } catch (Exception exception) {
+                    log.error("Failed to shutdown actor system.", exception);
+                }
             }
             if (ownsWorkspaceBasePath) {
                 try {
                     Files.walkFileTree(workspaceBasePath, RecursiveDeleteVisitor.getInstance());
                 } catch (IOException exception) {
-                    log.warn(String.format(
+                    log.error(String.format(
                         "Failed to delete workspace base path at %s.", workspaceBasePath
                     ), exception);
                 }

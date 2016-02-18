@@ -14,6 +14,19 @@ versatile: E.g., intermediate results can be kept as in-memory Java objects as w
 cloud-storage service. Likewise, processing of individual tasks can be as different as using an existing thread pool or
 by submitting a job to a distributed resource manager like Grid Engine.
 
+# Build
+
+CloudKeeper uses the [Maven](https://maven.apache.org) build tool, so all that is necessary to build CloudKeeper is to
+run `mvn install`.
+
+## Special Instructions
+
+### IntelliJ
+
+- Import from existing sources as Maven project. Once imported, in the “Maven Projects” tool window, ignore project
+  “ASM repackaged”. Unless this is done, IntelliJ would complain that it cannot find classes in package
+  `com.svbio.cloudkeeper.relocated.org.objectweb.asm.*`.
+
 # License
 
 Copyright 2016, Lifecode Inc.

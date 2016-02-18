@@ -126,27 +126,10 @@ public final class FileStagingArea extends ExternalStagingArea {
         return currentPath;
     }
 
-    private static void deleteEmptyNestedDirectories(Path directory, Path baseDirectory) throws IOException {
-        Path currentPath = directory;
-
-        // We want be on the safe side when deleting files/directories. Thus, a necessary requirement for deleting
-        // is that we are still within the baseDirectory.
-        while (currentPath.startsWith(baseDirectory) && !currentPath.equals(baseDirectory)) {
-            if (Files.exists(currentPath)) {
-                if (Files.newDirectoryStream(currentPath).iterator().hasNext()) {
-                    break;
-                }
-                Files.delete(currentPath);
-            }
-            currentPath = currentPath.getParent();
-        }
-    }
-
     @Override
     protected void delete(RuntimeExecutionTrace prefix, RuntimeAnnotatedExecutionTrace absolutePrefix)
             throws IOException {
         Path tracePath = toPath(prefix);
-        Path traceBasePath = tracePath.getParent();
         if (!prefix.getReference().isEmpty()) {
             Files.deleteIfExists(metadataPath(tracePath));
         }
@@ -154,8 +137,23 @@ public final class FileStagingArea extends ExternalStagingArea {
         synchronized (monitor) {
             // See JavaDoc for monitor
             Files.walkFileTree(tracePath, RecursiveDeleteVisitor.getInstance());
-            deleteEmptyNestedDirectories(traceBasePath, basePath);
+
+            // Ideally, we should also remove all enclosing directories that are empty (up to basePath). If we did this
+            // here, however, we would be violating the staging-area contract. Concurrent to this delete operation,
+            // another non-delete operation could be active in another JVM. This operation may try to create exactly the
+            // directory that would be removed here -- thus creating a race condition.
+            // For now, the policy of the file-based staging area is therefore that any directory not not "included" by
+            // the given execution trace will never be removed.
+            // See also: https://github.com/cloudkeeper-project/cloudkeeper/issues/20
         }
+    }
+
+    @Override
+    protected void preWrite(RuntimeExecutionTrace prefix, RuntimeAnnotatedExecutionTrace absolutePrefix)
+            throws IOException {
+        // AbstractStagingArea#delete() expects an execution trace without array indices, but not a problem in the
+        // implementation in this class
+        delete(prefix, absolutePrefix);
     }
 
     private static final class HardLinkVisitor extends SimpleFileVisitor<Path> {

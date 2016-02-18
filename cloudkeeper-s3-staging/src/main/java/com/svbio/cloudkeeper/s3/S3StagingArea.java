@@ -152,6 +152,14 @@ public final class S3StagingArea extends ExternalStagingArea {
     }
 
     @Override
+    protected void preWrite(RuntimeExecutionTrace prefix, RuntimeAnnotatedExecutionTrace absolutePrefix)
+            throws IOException {
+        // AbstractStagingArea#delete() expects an execution trace without array indices, but not a problem in the
+        // implementation in this class
+        delete(prefix, absolutePrefix);
+    }
+
+    @Override
     protected void copy(RuntimeExecutionTrace source, RuntimeExecutionTrace target,
             RuntimeAnnotatedExecutionTrace absoluteSource, RuntimeAnnotatedExecutionTrace absoluteTarget)
             throws IOException {
