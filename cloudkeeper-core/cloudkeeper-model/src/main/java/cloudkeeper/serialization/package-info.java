@@ -1,4 +1,4 @@
 @NonNullByDefault
 package cloudkeeper.serialization;
 
-import com.svbio.cloudkeeper.model.util.NonNullByDefault;
+import xyz.cloudkeeper.model.util.NonNullByDefault;

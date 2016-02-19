@@ -1,9 +1,9 @@
 package cloudkeeper.types;
 
 import cloudkeeper.serialization.ByteSequenceMarshaler;
-import com.svbio.cloudkeeper.model.CloudKeeperSerialization;
-import com.svbio.cloudkeeper.model.api.Marshaler;
-import com.svbio.cloudkeeper.model.api.UnmarshalContext;
+import xyz.cloudkeeper.model.CloudKeeperSerialization;
+import xyz.cloudkeeper.model.api.Marshaler;
+import xyz.cloudkeeper.model.api.UnmarshalContext;
 
 import javax.annotation.Nullable;
 import java.io.ByteArrayOutputStream;

@@ -1,6 +1,6 @@
 package cloudkeeper.annotations;
 
-import com.svbio.cloudkeeper.model.api.Marshaler;
+import xyz.cloudkeeper.model.api.Marshaler;
 
 import java.lang.annotation.Target;
 
@@ -13,9 +13,9 @@ import java.lang.annotation.Target;
  * first <em>capable</em> {@link Marshaler} will be chosen.
  *
  * <p>This annotation is a pure CloudKeeper annotation, which can only be used for retrieving annotations using
- * {@link com.svbio.cloudkeeper.model.runtime.execution.RuntimeAnnotatedExecutionTrace#getAnnotation(Class)}. This
+ * {@link xyz.cloudkeeper.model.runtime.execution.RuntimeAnnotatedExecutionTrace#getAnnotation(Class)}. This
  * annotation cannot, however, be added to a Java language element within the Java source code. The
- * {@link com.svbio.cloudkeeper.model.CloudKeeperSerialization} annotation must be used instead.
+ * {@link xyz.cloudkeeper.model.CloudKeeperSerialization} annotation must be used instead.
  */
 @Target({ })
 public @interface CloudKeeperSerialization {

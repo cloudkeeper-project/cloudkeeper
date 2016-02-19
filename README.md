@@ -25,7 +25,7 @@ run `mvn install`.
 
 - Import from existing sources as Maven project. Once imported, in the “Maven Projects” tool window, ignore project
   “ASM repackaged”. Unless this is done, IntelliJ would complain that it cannot find classes in package
-  `com.svbio.cloudkeeper.relocated.org.objectweb.asm.*`.
+  `xyz.cloudkeeper.relocated.org.objectweb.asm.*`.
 
 # License
 

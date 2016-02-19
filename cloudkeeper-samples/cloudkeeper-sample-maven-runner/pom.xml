@@ -14,7 +14,7 @@
     </description>
 
     <parent>
-        <groupId>com.svbio.cloudkeeper.samples</groupId>
+        <groupId>xyz.cloudkeeper.samples</groupId>
         <artifactId>cloudkeeper-samples</artifactId>
         <version>2.0.0.0-SNAPSHOT</version>
     </parent>
@@ -58,7 +58,7 @@
                         <ignoredUnusedDeclaredDependency>org.slf4j:slf4j-simple</ignoredUnusedDeclaredDependency>
                         <ignoredUnusedDeclaredDependency>com.google.guava:guava</ignoredUnusedDeclaredDependency>
                         <ignoredUnusedDeclaredDependency>
-                            com.svbio.cloudkeeper.core:cloudkeeper-dsl
+                            xyz.cloudkeeper.core:cloudkeeper-dsl
                         </ignoredUnusedDeclaredDependency>
                         <ignoredUnusedDeclaredDependency>
                             ${project.groupId}:${test.maven.bundle}
@@ -87,7 +87,7 @@
                     <archive>
                         <manifest>
                             <addClasspath>true</addClasspath>
-                            <mainClass>com.svbio.cloudkeeper.samples.maven.ModuleRunner</mainClass>
+                            <mainClass>xyz.cloudkeeper.samples.maven.ModuleRunner</mainClass>
                         </manifest>
                     </archive>
                 </configuration>
@@ -119,31 +119,31 @@
 
     <dependencies>
         <dependency>
-            <groupId>com.svbio.cloudkeeper.core</groupId>
+            <groupId>xyz.cloudkeeper.core</groupId>
             <artifactId>cloudkeeper-api</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.svbio.cloudkeeper.core</groupId>
+            <groupId>xyz.cloudkeeper.core</groupId>
             <artifactId>cloudkeeper-basic</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.svbio.cloudkeeper.core</groupId>
+            <groupId>xyz.cloudkeeper.core</groupId>
             <artifactId>cloudkeeper-dsl</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.svbio.cloudkeeper.core</groupId>
+            <groupId>xyz.cloudkeeper.core</groupId>
             <artifactId>cloudkeeper-linker</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.svbio.cloudkeeper.core</groupId>
+            <groupId>xyz.cloudkeeper.core</groupId>
             <artifactId>cloudkeeper-model</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.svbio.cloudkeeper.maven</groupId>
+            <groupId>xyz.cloudkeeper.maven</groupId>
             <artifactId>cloudkeeper-maven-bundle-loader</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.svbio.cloudkeeper.maven</groupId>
+            <groupId>xyz.cloudkeeper.maven</groupId>
             <artifactId>cloudkeeper-maven-bundles</artifactId>
         </dependency>
 
@@ -208,13 +208,13 @@
         <!-- The following dependencies are excluded from the Maven failsafe classpath. They exist only for the Maven
              reactor and for the Assembly plugin that generates the test Maven repository. -->
         <dependency>
-            <groupId>com.svbio.cloudkeeper.samples</groupId>
+            <groupId>xyz.cloudkeeper.samples</groupId>
             <artifactId>cloudkeeper-sample-maven-bundle</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>com.svbio.cloudkeeper.samples</groupId>
+            <groupId>xyz.cloudkeeper.samples</groupId>
             <artifactId>cloudkeeper-sample-maven-bundle</artifactId>
             <version>${project.version}</version>
             <type>ckbundle</type>

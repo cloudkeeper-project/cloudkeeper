@@ -1,9 +1,9 @@
 package cloudkeeper.serialization;
 
-import com.svbio.cloudkeeper.model.api.MarshalContext;
-import com.svbio.cloudkeeper.model.api.Marshaler;
-import com.svbio.cloudkeeper.model.api.UnmarshalContext;
-import com.svbio.cloudkeeper.model.immutable.element.NoKey;
+import xyz.cloudkeeper.model.api.MarshalContext;
+import xyz.cloudkeeper.model.api.Marshaler;
+import xyz.cloudkeeper.model.api.UnmarshalContext;
+import xyz.cloudkeeper.model.immutable.element.NoKey;
 
 import java.io.IOException;
 import java.io.InputStream;

@@ -1,12 +1,12 @@
 package cloudkeeper.serialization;
 
 import cloudkeeper.types.ByteSequence;
-import com.svbio.cloudkeeper.model.CloudKeeperSerialization;
-import com.svbio.cloudkeeper.model.api.MarshalContext;
-import com.svbio.cloudkeeper.model.api.Marshaler;
-import com.svbio.cloudkeeper.model.api.MarshalingException;
-import com.svbio.cloudkeeper.model.api.UnmarshalContext;
-import com.svbio.cloudkeeper.model.immutable.element.SimpleName;
+import xyz.cloudkeeper.model.CloudKeeperSerialization;
+import xyz.cloudkeeper.model.api.MarshalContext;
+import xyz.cloudkeeper.model.api.Marshaler;
+import xyz.cloudkeeper.model.api.MarshalingException;
+import xyz.cloudkeeper.model.api.UnmarshalContext;
+import xyz.cloudkeeper.model.immutable.element.SimpleName;
 
 import javax.annotation.Nullable;
 import java.io.BufferedReader;
