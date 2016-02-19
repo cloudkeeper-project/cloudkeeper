@@ -48,6 +48,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Implementation of workflow-execution builder.
@@ -388,25 +389,37 @@ final class WorkflowExecutionBuilderImpl implements WorkflowExecutionBuilder {
                 && cancellationPromise.tryComplete(new Failure<>(new CancellationException()));
         }
 
-        @Override
-        public void whenHasExecutionId(final OnActionComplete<Long> onHasExecutionId) {
-            executionIdFuture.onComplete(new OnComplete<Long>() {
+        private static <T> CompletableFuture<T> completableFutureOf(Future<T> scalaFuture,
+                ExecutionContext executionContext) {
+            CompletableFuture<T> completableFuture = new CompletableFuture<>();
+            scalaFuture.onComplete(new OnComplete<T>() {
                 @Override
-                public void onComplete(Throwable throwable, Long executionId) {
-                    onHasExecutionId.complete(throwable, executionId);
+                public void onComplete(@Nullable Throwable failure, @Nullable T success) {
+                    if (failure != null) {
+                        completableFuture.completeExceptionally(failure);
+                    } else {
+                        completableFuture.complete(success);
+                    }
                 }
             }, executionContext);
+            return completableFuture;
         }
 
         @Override
-        public void whenHasRootExecutionTrace(
-                final OnActionComplete<RuntimeAnnotatedExecutionTrace> onHasRootExecutionTrace) {
-            stagingAreaFuture.onComplete(new OnComplete<StagingArea>() {
+        public CompletableFuture<Long> getExecutionId() {
+            return completableFutureOf(executionIdFuture, executionContext);
+        }
+
+        @Override
+        public CompletableFuture<RuntimeAnnotatedExecutionTrace> getTrace() {
+            Future<RuntimeAnnotatedExecutionTrace> scalaFuture
+                    = stagingAreaFuture.map(new Mapper<StagingArea, RuntimeAnnotatedExecutionTrace>() {
                 @Override
-                public void onComplete(Throwable throwable, StagingArea stagingArea) {
-                    onHasRootExecutionTrace.complete(throwable, stagingArea.getAnnotatedExecutionTrace());
+                public RuntimeAnnotatedExecutionTrace apply(StagingArea stagingArea) {
+                    return stagingArea.getAnnotatedExecutionTrace();
                 }
             }, executionContext);
+            return completableFutureOf(scalaFuture, executionContext);
         }
 
         @Override
@@ -437,7 +450,7 @@ final class WorkflowExecutionBuilderImpl implements WorkflowExecutionBuilder {
         }
 
         @Override
-        public void whenHasOutput(final String outPortName, final OnActionComplete<Object> onHasOutput) {
+        public CompletableFuture<Object> getOutput(String outPortName) {
             Future<Object> outputValueFuture = stagingAreaFuture
                 .flatMap(new Mapper<StagingArea, Future<Object>>() {
                     @Override
@@ -445,39 +458,33 @@ final class WorkflowExecutionBuilderImpl implements WorkflowExecutionBuilder {
                         return getOutputValueFuture(outPortName, stagingArea);
                     }
                 }, executionContext);
-
-            outputValueFuture.onComplete(new OnComplete<Object>() {
-                @Override
-                public void onComplete(Throwable throwable, Object object) {
-                    onHasOutput.complete(mapThrowable(throwable), object);
-                }
-            }, executionContext);
+            return completableFutureOf(outputValueFuture, executionContext);
         }
 
         @Override
-        public void whenHasFinishTimeMillis(final OnActionComplete<Long> onHasFinishTimeMillis) {
-            finishTimeFuture.onComplete(new OnComplete<Long>() {
-                @Override
-                public void onComplete(Throwable throwable, Long finishTimeMillis) {
-                    onHasFinishTimeMillis.complete(throwable, finishTimeMillis);
-                }
-            }, executionContext);
+        public CompletableFuture<Long> getFinishTimeMillis() {
+            return completableFutureOf(finishTimeFuture, executionContext);
         }
 
         @Override
-        public void whenExecutionFinished(final OnActionComplete<Void> onExecutionFinished) {
+        public CompletableFuture<Void> toCompletableFuture() {
+            CompletableFuture<Void> completableFuture = new CompletableFuture<>();
             executionExceptionFuture.onComplete(new OnComplete<Option<WorkflowExecutionException>>() {
                 @Override
-                public void onComplete(Throwable throwable, Option<WorkflowExecutionException> optionalException) {
-                    WorkflowExecutionException exception = null;
-                    if (throwable != null) {
-                        exception = new WorkflowExecutionException("Unexpected exception.", throwable);
+                public void onComplete(@Nullable Throwable failure,
+                        @Nullable Option<WorkflowExecutionException> optionalException) {
+                    assert failure != null || optionalException != null;
+                    @Nullable Throwable actualFailure;
+                    if (failure != null) {
+                        completableFuture.completeExceptionally(failure);
                     } else if (optionalException.isDefined()) {
-                        exception = optionalException.get();
+                        completableFuture.completeExceptionally(optionalException.get());
+                    } else {
+                        completableFuture.complete(null);
                     }
-                    onExecutionFinished.complete(exception, null);
                 }
             }, executionContext);
+            return completableFuture;
         }
     }
 }

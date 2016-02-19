@@ -6,8 +6,6 @@ import com.svbio.cloudkeeper.dsl.SimpleModulePlugin;
 import com.svbio.cloudkeeper.model.api.CloudKeeperEnvironment;
 import com.svbio.cloudkeeper.model.api.WorkflowExecution;
 import com.svbio.cloudkeeper.model.util.ByteSequences;
-import com.svbio.cloudkeeper.simple.AwaitException;
-import com.svbio.cloudkeeper.simple.WorkflowExecutions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.Test;
@@ -53,8 +51,8 @@ public final class SingleVMTest {
         WorkflowExecution execution
             = divideModule.newPreconfiguredWorkflowExecutionBuilder(cloudKeeperEnvironment).start();
         try {
-            WorkflowExecutions.awaitFinish(execution, 1, TimeUnit.SECONDS);
-        } catch (AwaitException|TimeoutException|InterruptedException exception) {
+            execution.toCompletableFuture().get(1, TimeUnit.SECONDS);
+        } catch (ExecutionException|TimeoutException|InterruptedException exception) {
             LOG.debug("An expected exception occurred!", exception);
         }
     }

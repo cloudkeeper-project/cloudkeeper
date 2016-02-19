@@ -121,13 +121,11 @@ public final class CloudKeeperEnvironmentBuilder {
     }
 
     /**
-     * Sets whether intermediate results should be results should be retrieved and made available through
-     * {@link WorkflowExecution#whenHasOutput(String, WorkflowExecution.OnActionComplete)}.
+     * Sets whether results should be retrieved and made available through {@link WorkflowExecution#getOutput(String)}.
      *
-     * <p>If this option is set to {@code false}, any callback registered with
-     * {@link WorkflowExecution#whenHasOutput(String, WorkflowExecution.OnActionComplete)} will always receive a
-     * {@link com.svbio.cloudkeeper.model.api.WorkflowExecutionException} once the out-port value is available in the
-     * staging area.
+     * <p>If this option is set to {@code false}, the futures returned by {@link WorkflowExecution#getOutput(String)}
+     * will always be completed exceptionally with a {@link com.svbio.cloudkeeper.model.api.WorkflowExecutionException}
+     * once the out-port value is available in the staging area.
      *
      * <p>By default, this option is set to {@code true}.
      *

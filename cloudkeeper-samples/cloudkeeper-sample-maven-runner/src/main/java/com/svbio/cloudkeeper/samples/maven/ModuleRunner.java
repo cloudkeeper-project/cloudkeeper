@@ -17,7 +17,6 @@ import com.svbio.cloudkeeper.model.util.ImmutableList;
 import com.svbio.cloudkeeper.simple.DSLExecutableProvider;
 import com.svbio.cloudkeeper.simple.SimpleInstanceProvider;
 import com.svbio.cloudkeeper.simple.SingleVMCloudKeeper;
-import com.svbio.cloudkeeper.simple.WorkflowExecutions;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 import org.apache.maven.repository.internal.MavenRepositorySystemUtils;
@@ -132,8 +131,9 @@ public final class ModuleRunner {
             .setInputs(Collections.singletonMap(configuration.inPort, input))
             .setBundleIdentifiers(Collections.singletonList(configuration.dependency))
             .start();
-        String output = (String) WorkflowExecutions.getOutputValue(
-            workflowExecution, configuration.outPort.toString(), configuration.timeoutSeconds, TimeUnit.SECONDS);
+        String output = (String) workflowExecution
+            .getOutput(configuration.outPort.toString())
+            .get(configuration.timeoutSeconds, TimeUnit.SECONDS);
 
         cloudKeeper.shutdown().awaitTermination();
         Await.result(actorSystem.terminate(), Duration.Inf());

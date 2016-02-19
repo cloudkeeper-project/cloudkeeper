@@ -2,6 +2,8 @@ package com.svbio.cloudkeeper.model.api;
 
 import com.svbio.cloudkeeper.model.runtime.execution.RuntimeAnnotatedExecutionTrace;
 
+import java.util.concurrent.CompletableFuture;
+
 /**
  * CloudKeeper workflow execution.
  *
@@ -33,91 +35,62 @@ public interface WorkflowExecution {
     boolean cancel();
 
     /**
-     * Registers the given callback that will be executed when the linker has returned an annotated execution trace
-     * (containing the entire runtime representation of the workflow).
+     * Returns a new future that will normally be completed with the trace corresponding to the root module.
      *
-     * <p>If the annotated execution trace is already available, the given callback will be executed immediately.
-     *
-     * @param onHasRootExecutionTrace callback handler
-     * @throws NullPointerException if the argument is null
+     * @return the new future
      */
-    void whenHasRootExecutionTrace(OnActionComplete<RuntimeAnnotatedExecutionTrace> onHasRootExecutionTrace);
+    CompletableFuture<RuntimeAnnotatedExecutionTrace> getTrace();
 
     /**
-     * Registers the given callback that will be executed when an execution ID has been assigned.
+     * Returns a new future that will normally be completed with the execution ID.
      *
-     * <p>If the execution ID has already been assigned, the given callback will be executed immediately.
-     *
-     * @param onHasExecutionId callback handler
-     * @throws NullPointerException if the argument is null
+     * @return the new future
      */
-    void whenHasExecutionId(OnActionComplete<Long> onHasExecutionId);
+    CompletableFuture<Long> getExecutionId();
 
     /**
      * Returns whether the execution is still running.
      *
      * <p>Even while the workflow execution is still running, individual outputs may already be available through
-     * {@link #whenHasOutput(String, OnActionComplete)}.
+     * {@link #getOutput(String)}.
      *
-     * @return whether the execution is still running
+     * @return {@code true} if the execution is still running, {@code false} otherwise
      */
     boolean isRunning();
 
     /**
-     * Registers the given callback that will be executed when the output for the given out-port has become available.
+     * Returns a new future that will normally be completed with the output value for the given out-port.
      *
-     * <p>If the workflow execution has already finished, the given callback will be executed immediately.
-     *
-     * <p>Note that this method returns immediately and is therefore not expected to throw any exceptions (unless any of
-     * the arguments is null). If the given {@code outPortName} is invalid, an appropriate runtime exception will be
-     * passed to the completion handler. If the workflow execution fails for any reason, the callback will be passed
-     * a {@link WorkflowExecutionException}.
+     * <p>This method returns immediately and will not throw any exceptions (unless the arguments is null). If the given
+     * {@code outPortName} is invalid, the returned future will be completed exceptionally with an
+     * {@link IllegalArgumentException}.
      *
      * @param outPortName name of the out-port
-     * @param onHasOutput callback handler
-     * @throws NullPointerException if any of the arguments is null
+     * @return the new future
      */
-    void whenHasOutput(String outPortName, OnActionComplete<Object> onHasOutput);
+    CompletableFuture<Object> getOutput(String outPortName);
 
     /**
-     * Registers the given callback that will be executed when the workflow execution has finished.
+     * Returns a new future that will normally be completed with the difference, measured in milliseconds, between the
+     * finish time and midnight, January 1, 1970 UTC.
      *
-     * <p>If the workflow execution has already finished, the given callback will be executed immediately. The value
-     * passed to {@link OnActionComplete#complete(Throwable, Object)} in case of success is the the difference, measured
-     * in milliseconds, between the finish time and midnight, January 1, 1970 UTC.
+     * <p>The value is to be interpreted in the same way as {@link System#currentTimeMillis()}. This future will be
+     * completed normally even if an expected exception occurs during the workflow execution. Use
+     * {@link #toCompletableFuture()} if interested in such exceptions (or to determine whether the workflow execution
+     * was successful).
      *
-     * @param onHasFinishTimeMillis callback handler
-     * @throws NullPointerException if the argument is null
+     * @return the new future
      */
-    void whenHasFinishTimeMillis(OnActionComplete<Long> onHasFinishTimeMillis);
+    CompletableFuture<Long> getFinishTimeMillis();
 
     /**
-     * Registers the given callback that will be executed when the workflow execution has finished.
+     * Returns a new future that represents this workflow execution and that will normally be completed with
+     * {@code null}.
      *
-     * <p>If the workflow execution has already finished, the given callback will be executed immediately. The value
-     * passed to {@link OnActionComplete#complete(Throwable, Object)} in case of success is null.
+     * <p>At the time the returned futures is completed, it is guaranteed that all futures returned by other methods in
+     * this interface have been completed, too.
      *
-     * @param onExecutionFinished callback handler
-     * @throws NullPointerException if the argument is null
+     * @return the new future
      */
-    void whenExecutionFinished(OnActionComplete<Void> onExecutionFinished);
-
-    /**
-     * Callback for when an action is completed with either failure or success.
-     *
-     * @param <T> type of the value that the action will be completed with in case of success
-     */
-    interface OnActionComplete<T> {
-        /**
-         * This method will be invoked once the action that this callback is registered on becomes completed with a
-         * failure or a success.
-         *
-         * <p>In the case of success {@code exception} will be {@code null}, otherwise it will contain the reason of the
-         * failure.
-         *
-         * @param throwable reason for the failure of the action
-         * @param value value that the action was successfully completed with
-         */
-        void complete(Throwable throwable, T value);
-    }
+    CompletableFuture<Void> toCompletableFuture();
 }

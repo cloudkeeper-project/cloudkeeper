@@ -75,8 +75,8 @@ public class SingleVMCloudKeeperTest {
         int result = WorkflowExecutions.getOutputValue(
             workflowExecution, binarySumModule.sum(), WAIT_SECONDS, TimeUnit.SECONDS);
         Assert.assertEquals(result, 10);
-        WorkflowExecutions.awaitFinish(workflowExecution, WAIT_SECONDS, TimeUnit.SECONDS);
 
+        workflowExecution.toCompletableFuture().get(WAIT_SECONDS, TimeUnit.SECONDS);
         simpleCloudKeeper.shutdown();
     }
 
@@ -95,7 +95,7 @@ public class SingleVMCloudKeeperTest {
             workflowExecution, fibonacciModule.result(), WAIT_SECONDS, TimeUnit.SECONDS);
         Assert.assertEquals(result, 5);
 
-        WorkflowExecutions.awaitFinish(workflowExecution, WAIT_SECONDS, TimeUnit.SECONDS);
+        workflowExecution.toCompletableFuture().get(WAIT_SECONDS, TimeUnit.SECONDS);
     }
 
     @Test
@@ -108,11 +108,10 @@ public class SingleVMCloudKeeperTest {
             .setBundleIdentifiers(Arrays.asList(SimpleRepository.BUNDLE_ID, FibonacciRepository.BUNDLE_ID))
             .setInputs(Collections.singletonMap(SimpleName.identifier("n"), (Object) 5))
             .start();
-        int result = (Integer) WorkflowExecutions.getOutputValue(
-            workflowExecution, "result", WAIT_SECONDS, TimeUnit.SECONDS);
+        int result = (Integer) workflowExecution.getOutput("result").get(WAIT_SECONDS, TimeUnit.SECONDS);
         Assert.assertEquals(result, 5);
 
-        WorkflowExecutions.awaitFinish(workflowExecution, WAIT_SECONDS, TimeUnit.SECONDS);
+        workflowExecution.toCompletableFuture().get(WAIT_SECONDS, TimeUnit.SECONDS);
     }
 
     @Test
@@ -127,15 +126,12 @@ public class SingleVMCloudKeeperTest {
             .start();
 
         for (int k = 0; k <= n; ++k) {
-            Object object
-                = WorkflowExecutions.getOutputValue(workflowExecution, "coef_" + k, WAIT_SECONDS, TimeUnit.SECONDS);
-
             Assert.assertEquals(
-                (int) object,
+                (int) workflowExecution.getOutput("coef_" + k).get(WAIT_SECONDS, TimeUnit.SECONDS),
                 binomial(n, k)
             );
         }
-        WorkflowExecutions.awaitFinish(workflowExecution, WAIT_SECONDS, TimeUnit.SECONDS);
+        workflowExecution.toCompletableFuture().get(WAIT_SECONDS, TimeUnit.SECONDS);
     }
 
     private static int binomial(int n, int k) {

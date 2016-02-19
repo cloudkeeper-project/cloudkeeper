@@ -13,7 +13,6 @@ import com.svbio.cloudkeeper.model.CloudKeeperSerialization;
 import com.svbio.cloudkeeper.model.api.CloudKeeperEnvironment;
 import com.svbio.cloudkeeper.model.api.WorkflowExecution;
 import com.svbio.cloudkeeper.model.util.ByteSequences;
-import com.svbio.cloudkeeper.simple.AwaitException;
 import com.svbio.cloudkeeper.simple.WorkflowExecutions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -88,14 +87,10 @@ public final class FileManipulationFuture implements Future<FileManipulationResu
     public FileManipulationResult get(long timeout, TimeUnit unit)
         throws InterruptedException, ExecutionException, TimeoutException {
 
-        try {
-            ByteSequence byteSequence = WorkflowExecutions.getOutputValue(execution, module.outText(), timeout, unit);
-            int numberOfLines = WorkflowExecutions.getOutputValue(execution, module.outNumLines(), timeout, unit);
-            long sizeOfFile = WorkflowExecutions.getOutputValue(execution, module.outTextSize(), timeout, unit);
-            return new FileManipulationResult(byteSequence, numberOfLines, sizeOfFile);
-        } catch (AwaitException exception) {
-            throw new ExecutionException(exception);
-        }
+        ByteSequence byteSequence = WorkflowExecutions.getOutputValue(execution, module.outText(), timeout, unit);
+        int numberOfLines = WorkflowExecutions.getOutputValue(execution, module.outNumLines(), timeout, unit);
+        long sizeOfFile = WorkflowExecutions.getOutputValue(execution, module.outTextSize(), timeout, unit);
+        return new FileManipulationResult(byteSequence, numberOfLines, sizeOfFile);
     }
 
     @CloudKeeperSerialization(ByteSequenceMarshaler.class)
