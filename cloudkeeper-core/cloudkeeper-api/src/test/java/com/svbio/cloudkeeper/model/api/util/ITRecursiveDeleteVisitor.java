@@ -36,7 +36,7 @@ public class ITRecursiveDeleteVisitor {
         }
     }
 
-    private static class DirectoryStructure {
+    private static final class DirectoryStructure {
         private final Path root;
         private final Path otherDir;
         private final Path bar;

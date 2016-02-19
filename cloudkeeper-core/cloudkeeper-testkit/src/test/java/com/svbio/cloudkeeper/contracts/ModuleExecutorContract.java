@@ -29,9 +29,8 @@ public final class ModuleExecutorContract {
     private final StagingAreaContractProvider stagingAreaContractProvider;
     private final FiniteDuration awaitDuration;
 
-    public ModuleExecutorContract(SimpleModuleExecutor simpleModuleExecutor, StagingAreaContractProvider stagingAreaContractProvider,
-        FiniteDuration awaitDuration) {
-
+    public ModuleExecutorContract(SimpleModuleExecutor simpleModuleExecutor,
+            StagingAreaContractProvider stagingAreaContractProvider, FiniteDuration awaitDuration) {
         this.simpleModuleExecutor = simpleModuleExecutor;
         this.stagingAreaContractProvider = stagingAreaContractProvider;
         this.awaitDuration = awaitDuration;
@@ -71,7 +70,8 @@ public final class ModuleExecutorContract {
 
     @Test
     public void submitTestThrowingModule() throws Exception {
-        StagingAreaContractHelper helper = new StagingAreaContractHelper(stagingAreaContractProvider, ThrowingModule.class);
+        StagingAreaContractHelper helper
+            = new StagingAreaContractHelper(stagingAreaContractProvider, ThrowingModule.class);
         StagingArea stagingArea = helper.createStagingArea("submitTestThrowingModule");
         await(stagingArea.putObject(ExecutionTrace.empty().resolveInPort(SimpleName.identifier("string")), "foo"));
 

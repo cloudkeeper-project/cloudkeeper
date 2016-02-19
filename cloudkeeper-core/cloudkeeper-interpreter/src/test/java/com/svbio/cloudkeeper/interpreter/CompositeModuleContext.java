@@ -159,8 +159,8 @@ public final class CompositeModuleContext implements Immutable {
     public static final class Builder {
         private static final Name PACKAGE = Name.qualifiedName(Builder.class.getPackage().getName());
         private static final Pattern CONNECTION_PATTERN = Pattern.compile(
-            "(?<source>\\p{Lower}+)(?:\\.(?<sourceport>\\p{Lower}+))? -> " +
-                "(?<target>\\p{Lower}+)(?:\\.(?<targetport>\\p{Lower}+))?"
+            "(?<source>\\p{Lower}+)(?:\\.(?<sourceport>\\p{Lower}+))? -> "
+                + "(?<target>\\p{Lower}+)(?:\\.(?<targetport>\\p{Lower}+))?"
         );
 
         private final URI bundleIdentifier;

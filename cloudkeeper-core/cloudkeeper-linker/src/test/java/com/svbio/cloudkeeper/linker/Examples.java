@@ -62,8 +62,8 @@ public final class Examples {
     public static MutableBundle fibonacciBundle() {
         return new MutableBundle()
             .setBundleIdentifier(
-                URI.create("x-maven:com.svbio.cloudkeeper.examples.bundles:fibonacci:ckbundle.zip:" +
-                    "0.0.1-SNAPSHOT")
+                URI.create("x-maven:com.svbio.cloudkeeper.examples.bundles:fibonacci:ckbundle.zip:"
+                    + "0.0.1-SNAPSHOT")
             )
             .setCreationTime(new Date(1388577600000L))
             .setPackages(Collections.singletonList(

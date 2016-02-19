@@ -53,8 +53,8 @@ public class DSLRuntimeContextFactoryTest {
             Assert.assertEquals(repository.getBundles().size(), 1);
             Assert.assertEquals(repository.getBundles().get(0).getBundleIdentifier(), bundleIdentifier);
 
-            RuntimeSimpleModuleDeclaration binarySumDeclaration
-                = repository.getElement(RuntimeSimpleModuleDeclaration.class, Name.qualifiedName(BinarySum.class.getName()));
+            RuntimeSimpleModuleDeclaration binarySumDeclaration = repository.getElement(
+                RuntimeSimpleModuleDeclaration.class, Name.qualifiedName(BinarySum.class.getName()));
             Assert.assertNotNull(binarySumDeclaration);
             Assert.assertEquals(binarySumDeclaration.getPorts().size(), 3);
         }

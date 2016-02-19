@@ -33,7 +33,7 @@ public class ScalaFuturesTest {
         executorService.shutdown();
     }
 
-    private static class ExpectedException extends RuntimeException {
+    private static final class ExpectedException extends RuntimeException {
         private static final long serialVersionUID = -1374943519055881413L;
 
         private ExpectedException(String message) {

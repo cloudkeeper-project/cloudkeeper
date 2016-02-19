@@ -423,6 +423,7 @@
                             <failOnViolation>true</failOnViolation>
                             <consoleOutput>true</consoleOutput>
                             <configLocation>src/main/config/mandatory-checkstyle.xml</configLocation>
+                            <includeTestSourceDirectory>true</includeTestSourceDirectory>
                             <suppressionsLocation>src/main/config/suppressions.xml</suppressionsLocation>
                             <suppressionsFileExpression>checkstyle.suppressions.file</suppressionsFileExpression>
                         </configuration>

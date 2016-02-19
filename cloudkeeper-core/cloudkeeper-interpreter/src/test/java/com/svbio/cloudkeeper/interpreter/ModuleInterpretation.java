@@ -73,7 +73,7 @@ final class ModuleInterpretation implements AutoCloseable {
         private long executionId = 1001;
         @Nullable private Map<String, ?> config;
 
-        public Builder(String name, RuntimeRepository repository, RuntimeAnnotatedExecutionTrace executionTrace) {
+        Builder(String name, RuntimeRepository repository, RuntimeAnnotatedExecutionTrace executionTrace) {
             this.name = name;
             this.repository = repository;
             this.executionTrace = executionTrace;
@@ -270,7 +270,7 @@ final class ModuleInterpretation implements AutoCloseable {
         private final TestProbe receivingProbe;
         private final CallingThreadExecutor asyncTaskExecutor;
 
-        private static class Factory implements Creator<ForwardingActor> {
+        private static final class Factory implements Creator<ForwardingActor> {
             private static final long serialVersionUID = 314355822603349450L;
 
             private final TestProbe receivingProbe;

@@ -57,7 +57,7 @@ final class StagingAreaContractHelper {
                 repository,
                 linkerOptions
             );
-        } catch (ClassNotFoundException|LinkerException exception) {
+        } catch (ClassNotFoundException | LinkerException exception) {
             Assert.fail("Exception while setting up test case.", exception);
             // The following line is necessary for the compiler.
             throw new AssertionError("This line should never be never reached.", exception);
@@ -88,7 +88,8 @@ final class StagingAreaContractHelper {
         @Override
         public RuntimeAnnotatedExecutionTrace newAnnotatedExecutionTrace(BareExecutionTrace absoluteTrace,
                 BareModule bareModule, List<? extends BareOverride> overrides) throws LinkerException {
-            return Linker.createAnnotatedExecutionTrace(absoluteTrace, bareModule, overrides, repository, linkerOptions);
+            return Linker.createAnnotatedExecutionTrace(
+                absoluteTrace, bareModule, overrides, repository, linkerOptions);
         }
     }
 
@@ -100,7 +101,9 @@ final class StagingAreaContractHelper {
         return repository;
     }
 
-    InstanceProvider getInstanceProvider(InstanceProvider delegate) { return new InstanceProviderImpl(delegate); }
+    InstanceProvider getInstanceProvider(InstanceProvider delegate) {
+        return new InstanceProviderImpl(delegate);
+    }
 
 
     private final class InstanceProviderImpl implements InstanceProvider {

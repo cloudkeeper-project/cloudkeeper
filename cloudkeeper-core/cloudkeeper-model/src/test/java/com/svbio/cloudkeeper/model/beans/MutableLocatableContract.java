@@ -313,7 +313,7 @@ public class MutableLocatableContract implements ITest {
         Assert.assertTrue(duplicates.isEmpty(), "Shared object references found.");
     }
 
-    private static class GetterSetterPair {
+    private static final class GetterSetterPair {
         private final Method getter;
         private final Method setter;
 
@@ -384,12 +384,12 @@ public class MutableLocatableContract implements ITest {
 
     @Test(dependsOnMethods = "setters")
     public void xmlSerialization() throws Exception {
-        MutableLocatable<?> copyWithoutLocations = (MutableLocatable <?>) staticCopyMethod.invoke(
+        MutableLocatable<?> copyWithoutLocations = (MutableLocatable<?>) staticCopyMethod.invoke(
             null, instance, new CopyOption[] { StandardCopyOption.STRIP_LOCATION });
 
         Object objectToSerialize = copyWithoutLocations;
         Class<?> classToBind = copyWithoutLocations.getClass();
-        @Nullable XmlAdapter<?,?> xmlAdapter = null;
+        @Nullable XmlAdapter<?, ?> xmlAdapter = null;
         if (!clazz.isAnnotationPresent(XmlRootElement.class)) {
             Class<?> currentClass = clazz;
             while (MutableLocatable.class.isAssignableFrom(currentClass)
@@ -400,7 +400,7 @@ public class MutableLocatableContract implements ITest {
                     Class<?> typeAdapterClass = typeAdapter.value();
                     Constructor<?> typeAdapterConstructor = typeAdapterClass.getDeclaredConstructor();
                     typeAdapterConstructor.setAccessible(true);
-                    xmlAdapter = (XmlAdapter<?,?>) typeAdapterConstructor.newInstance();
+                    xmlAdapter = (XmlAdapter<?, ?>) typeAdapterConstructor.newInstance();
                     Object xmlAdaptedObject = uncheckedMarshal(copyWithoutLocations, xmlAdapter);
                     classToBind = xmlAdaptedObject.getClass();
                     objectToSerialize = uncheckedNewJAXBElement(classToBind, xmlAdaptedObject);

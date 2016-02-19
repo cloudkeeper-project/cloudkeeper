@@ -52,7 +52,7 @@ public final class SingleVMTest {
             = divideModule.newPreconfiguredWorkflowExecutionBuilder(cloudKeeperEnvironment).start();
         try {
             execution.toCompletableFuture().get(1, TimeUnit.SECONDS);
-        } catch (ExecutionException|TimeoutException|InterruptedException exception) {
+        } catch (ExecutionException | TimeoutException | InterruptedException exception) {
             LOG.debug("An expected exception occurred!", exception);
         }
     }

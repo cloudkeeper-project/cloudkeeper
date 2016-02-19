@@ -53,7 +53,8 @@ public class ApplyToAllTest {
         GatherStatisticsModule gatherStatisticsModule = ModuleFactory.getDefault().create(GatherStatisticsModule.class);
         Assert.assertEquals(gatherStatisticsModule.getModules().size(), 3);
         Assert.assertEquals(
-            ((BareDeclaredType) gatherStatisticsModule.inBAMFile().getType()).getDeclaration().getQualifiedName().toString(),
+            ((BareDeclaredType) gatherStatisticsModule.inBAMFile().getType())
+                .getDeclaration().getQualifiedName().toString(),
             BAMFile.class.getName()
         );
         Assert.assertEquals(

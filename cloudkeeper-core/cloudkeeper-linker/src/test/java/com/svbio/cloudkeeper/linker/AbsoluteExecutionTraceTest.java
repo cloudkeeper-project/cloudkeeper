@@ -70,14 +70,26 @@ public class AbsoluteExecutionTraceTest {
                     .getPorts()
             )
         );
-        try { root.getInPort(); Assert.fail(); } catch (IllegalStateException exception) { /* expected */ }
-        try { root.getOutPort(); Assert.fail(); } catch (IllegalStateException exception) { /* expected */ }
+        try {
+            root.getInPort();
+            Assert.fail();
+        } catch (IllegalStateException ignored) { }
+        try {
+            root.getOutPort();
+            Assert.fail();
+        } catch (IllegalStateException ignored) { }
 
 
         RuntimeAnnotatedExecutionTrace zeroTrace = root.resolveContent().resolveModule(SimpleName.identifier("zero"));
         Assert.assertTrue(zeroTrace.getModule() instanceof InputModuleImpl);
-        try { zeroTrace.getInPort(); Assert.fail(); } catch (IllegalStateException exception) { /* expected */ }
-        try { zeroTrace.getOutPort(); Assert.fail(); } catch (IllegalStateException exception) { /* expected */ }
+        try {
+            zeroTrace.getInPort();
+            Assert.fail();
+        } catch (IllegalStateException ignored) { }
+        try {
+            zeroTrace.getOutPort();
+            Assert.fail();
+        } catch (IllegalStateException ignored) { }
 
         Memory memory = zeroTrace.getAnnotation(Memory.class);
         Assert.assertEquals(memory.value(), 12);
@@ -94,7 +106,13 @@ public class AbsoluteExecutionTraceTest {
                     .getPorts()
             )
         );
-        try { sumTrace.getInPort(); Assert.fail(); } catch (IllegalStateException exception) { /* expected */ }
-        try { sumTrace.getOutPort(); Assert.fail(); } catch (IllegalStateException exception) { /* expected */ }
+        try {
+            sumTrace.getInPort();
+            Assert.fail();
+        } catch (IllegalStateException ignored) { }
+        try {
+            sumTrace.getOutPort();
+            Assert.fail();
+        } catch (IllegalStateException ignored) { }
     }
 }

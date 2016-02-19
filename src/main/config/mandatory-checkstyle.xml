@@ -76,7 +76,20 @@
         <module name="EmptyForIteratorPad"/>
         <module name="GenericWhitespace"/>
         <module name="MethodParamPad"/>
-        <module name="NoWhitespaceAfter"/>
+        <module name="NoWhitespaceAfter">
+            <!-- We exclude ARRAY_INIT because of
+                 https://google.github.io/styleguide/javaguide.html#s4.6.2-horizontal-whitespace that allows optional
+                 whitespace "just inside both braces of an array initializer" -->
+            <property name="tokens" value="INC"/>
+            <property name="tokens" value="DEC"/>
+            <property name="tokens" value="UNARY_MINUS"/>
+            <property name="tokens" value="UNARY_PLUS"/>
+            <property name="tokens" value="BNOT"/>
+            <property name="tokens" value="LNOT"/>
+            <property name="tokens" value="DOT"/>
+            <property name="tokens" value="ARRAY_DECLARATOR"/>
+            <property name="tokens" value="INDEX_OP"/>
+        </module>
         <module name="NoWhitespaceBefore"/>
         <module name="OperatorWrap"/>
         <module name="ParenPad"/>

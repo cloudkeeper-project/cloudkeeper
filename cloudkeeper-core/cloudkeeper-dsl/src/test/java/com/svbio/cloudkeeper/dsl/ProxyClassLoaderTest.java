@@ -59,8 +59,8 @@ public class ProxyClassLoaderTest {
                 case "arrayList": return Arrays.asList(3, 4);
                 case "interfaceList": return Arrays.asList(5, 6);
                 case "derivedList": return Arrays.asList(7, 8);
+                default: return null;
             }
-            return null;
         }
     }
 

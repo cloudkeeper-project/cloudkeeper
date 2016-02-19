@@ -51,7 +51,7 @@ public class ITBundles {
                 unresolvedArtifact.getGroupId(), unresolvedArtifact.getArtifactId(),
                 Version.valueOf(unresolvedArtifact.getVersion())
             ));
-        File bundleFile = new File(tempDir.toFile(),"systemBundle.xml");
+        File bundleFile = new File(tempDir.toFile(), "systemBundle.xml");
         Marshaller marshaller = jaxbContext.createMarshaller();
         marshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, true);
         marshaller.marshal(systemBundle, bundleFile);

@@ -11,7 +11,8 @@ public abstract class GreaterOrEqual extends SimpleModule<GreaterOrEqual> {
     public abstract OutPort<Boolean> result();
 
     public GreaterOrEqual from(FromConnectable<Integer> num1, FromConnectable<Integer> num2) {
-        return num1().from(num1). num2().from(num2);
+        return num1().from(num1)
+            .num2().from(num2);
     }
 
     @Override

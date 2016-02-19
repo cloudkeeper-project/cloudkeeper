@@ -144,7 +144,7 @@ public class ITMavenRuntimeContextProvider {
         try {
             verifyClassLoader((URLClassLoader) classLoader);
             classLoaderVerified = true;
-        } catch (RepositoryException|URISyntaxException exception) {
+        } catch (RepositoryException | URISyntaxException exception) {
             Assert.fail("Failed to collect classpaths because of an unexpected exception.", exception);
         }
 

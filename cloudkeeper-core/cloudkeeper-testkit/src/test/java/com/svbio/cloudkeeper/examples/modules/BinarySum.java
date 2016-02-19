@@ -11,7 +11,8 @@ public abstract class BinarySum extends SimpleModule<BinarySum> {
     public abstract OutPort<Integer> sum();
 
     public BinarySum from(FromConnectable<Integer> num1, FromConnectable<Integer> num2) {
-        return num1().from(num1). num2().from(num2);
+        return num1().from(num1)
+            .num2().from(num2);
     }
 
     @Override

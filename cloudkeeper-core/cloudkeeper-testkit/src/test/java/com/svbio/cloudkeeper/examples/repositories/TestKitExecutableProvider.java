@@ -18,7 +18,8 @@ import java.util.Optional;
  * CloudKeeper DSL.
  */
 public class TestKitExecutableProvider implements ExecutableProvider {
-    private static final TestKitExecutableProvider DEFAULT_INSTANCE = new TestKitExecutableProvider(ModuleFactory.getDefault());
+    private static final TestKitExecutableProvider DEFAULT_INSTANCE
+        = new TestKitExecutableProvider(ModuleFactory.getDefault());
 
     private final ModuleFactory moduleFactory;
 
@@ -31,7 +32,8 @@ public class TestKitExecutableProvider implements ExecutableProvider {
      * {@link ModuleFactory#getDefault()}.
      *
      * <p>The returned Java connector is equivalent (barring caches) to a Java connector created with
-     * {@link #TestKitExecutableProvider(ModuleFactory)}, where {@link ModuleFactory#getDefault()} is is passed as argument.
+     * {@link #TestKitExecutableProvider(ModuleFactory)}, where {@link ModuleFactory#getDefault()} is is passed as
+     * argument.
      */
     public static TestKitExecutableProvider getDefault() {
         return DEFAULT_INSTANCE;

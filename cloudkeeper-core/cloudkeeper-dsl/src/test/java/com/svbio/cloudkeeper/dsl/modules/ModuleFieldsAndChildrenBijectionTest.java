@@ -14,13 +14,14 @@ import java.util.Arrays;
 import java.util.HashSet;
 
 /**
- * Test that there is a bijection between {@link com.svbio.cloudkeeper.model.bare.element.module.BareModule} fields and child modules.
+ * Test that there is a bijection between {@link com.svbio.cloudkeeper.model.bare.element.module.BareModule} fields and
+ * child modules.
  */
 public class ModuleFieldsAndChildrenBijectionTest {
     @CompositeModulePlugin("Test module to verify that child modules are assigned to member fields.")
-    public abstract static class DanglingChildModule extends CompositeModule<DanglingChildModule> {{
+    public abstract static class DanglingChildModule extends CompositeModule<DanglingChildModule> { {
         child(Sum.class);
-    }}
+    } }
 
     @Test
     public void danglingChildTest() throws Exception {
@@ -30,7 +31,7 @@ public class ModuleFieldsAndChildrenBijectionTest {
         } catch (DanglingChildException exception) {
             Location location = exception.getLocation();
             Assert.assertTrue(location.getSystemId().contains(DanglingChildModule.class.getName()));
-            Assert.assertEquals(location.getLineNumber(), 22);
+            Assert.assertEquals(location.getLineNumber(), 23);
         }
     }
 
@@ -56,7 +57,7 @@ public class ModuleFieldsAndChildrenBijectionTest {
             );
             Location location = exception.getLocation();
             Assert.assertTrue(location.getSystemId().contains(RedundantChildModule.class.getName()));
-            Assert.assertEquals(location.getLineNumber(), 41);
+            Assert.assertEquals(location.getLineNumber(), 42);
         }
     }
 

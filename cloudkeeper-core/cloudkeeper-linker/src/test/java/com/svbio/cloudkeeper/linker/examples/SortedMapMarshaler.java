@@ -8,7 +8,7 @@ import com.svbio.cloudkeeper.model.beans.element.serialization.MutableSerializat
 import java.io.IOException;
 import java.util.SortedMap;
 
-public final class SortedMapMarshaler implements Marshaler<SortedMap<?,?>> {
+public final class SortedMapMarshaler implements Marshaler<SortedMap<?, ?>> {
     @Override
     public boolean isImmutable(SortedMap<?, ?> object) {
         return false;
@@ -25,7 +25,7 @@ public final class SortedMapMarshaler implements Marshaler<SortedMap<?,?>> {
     }
 
 
-    public static class Beans {
+    public static final class Beans {
         private Beans() { }
 
         public static MutableSerializationDeclaration declaration() {

@@ -48,8 +48,8 @@ public final class TestKitRuntimeContextFactory implements RuntimeContextFactory
             @Nullable final String providerClassName = bundleIdentifier.getSchemeSpecificPart();
             if (providerClassName == null || providerClassName.isEmpty()) {
                 return Futures.failed(new RuntimeStateProvisionException(String.format(
-                    "Expected bundle identifier (URI) that contains a class name in the schema-specific part, but bundle "
-                        + "identifier is '%s'.", bundleIdentifier
+                    "Expected bundle identifier (URI) that contains a class name in the schema-specific part, but "
+                        + "bundle identifier is '%s'.", bundleIdentifier
                 )));
             }
 
@@ -57,7 +57,8 @@ public final class TestKitRuntimeContextFactory implements RuntimeContextFactory
                 Class<?> providerClass = Class.forName(providerClassName);
                 if (!TestKitBundleProvider.class.isAssignableFrom(providerClass)) {
                     return Futures.failed(new RuntimeStateProvisionException(String.format(
-                        "Expected bundle identifier (URI) that contains the name of a class implementing %s, but got '%s'.",
+                        "Expected bundle identifier (URI) that contains the name of a class implementing %s, but got "
+                            + "'%s'.",
                         TestKitBundleProvider.class, bundleIdentifier
                     )));
                 }

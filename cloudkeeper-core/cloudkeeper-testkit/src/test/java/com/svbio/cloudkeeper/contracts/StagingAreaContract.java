@@ -550,7 +550,7 @@ public final class StagingAreaContract implements ITest {
         assertEqualByteSequences(LOREM_BYTE_SEQUENCE, actualLoremByteSequence);
     }
 
-    private static class MutableByteSequence implements ByteSequence {
+    private static final class MutableByteSequence implements ByteSequence {
         private ByteSequence byteSequence;
 
         private MutableByteSequence(ByteSequence byteSequence) {

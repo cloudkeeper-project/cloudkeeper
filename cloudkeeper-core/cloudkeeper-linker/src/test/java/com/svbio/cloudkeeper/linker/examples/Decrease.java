@@ -8,7 +8,7 @@ import com.svbio.cloudkeeper.model.beans.type.MutableDeclaredType;
 
 import java.util.Arrays;
 
-public class Decrease {
+public final class Decrease {
     private Decrease() { }
 
     public static MutableSimpleModuleDeclaration declaration() {

@@ -285,7 +285,7 @@ public final class DummyAetherRepository {
             Artifact bundleArtifact = new SubArtifact(pomArtifact, "", "ckbundle", bundleFile.toFile());
 
             installBundleWithJar(pomArtifact, bundleArtifact, declarationClasses);
-        } catch (JAXBException|XMLStreamException exception) {
+        } catch (JAXBException | XMLStreamException exception) {
             throw new IllegalStateException("Unexpected exception!", exception);
         }
     }
