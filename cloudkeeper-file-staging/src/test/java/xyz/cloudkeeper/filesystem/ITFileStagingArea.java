@@ -1,12 +1,9 @@
 package xyz.cloudkeeper.filesystem;
 
-import akka.dispatch.ExecutionContexts;
 import org.testng.Assert;
 import org.testng.annotations.AfterSuite;
 import org.testng.annotations.BeforeSuite;
 import org.testng.annotations.Factory;
-import scala.concurrent.ExecutionContext;
-import scala.concurrent.Future;
 import xyz.cloudkeeper.contracts.RemoteStagingAreaContract;
 import xyz.cloudkeeper.contracts.StagingAreaContract;
 import xyz.cloudkeeper.contracts.StagingAreaContractProvider;
@@ -23,12 +20,13 @@ import javax.xml.bind.JAXBException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 
 public class ITFileStagingArea {
     private final InstanceProvider instanceProvider = new InstanceProviderImpl();
     @Nullable private Path tempDir;
     private final CallingThreadExecutor executor = new CallingThreadExecutor();
-    private final ExecutionContext executionContext = ExecutionContexts.fromExecutor(executor);
 
     @BeforeSuite
     public void setup() throws IOException, JAXBException {
@@ -67,14 +65,14 @@ public class ITFileStagingArea {
                 // The following statement is only necessary to make the compiler happy.
                 return null;
             }
-            return new FileStagingArea.Builder(runtimeContext, executionTrace, rootPath, executionContext).build();
+            return new FileStagingArea.Builder(runtimeContext, executionTrace, rootPath, executor).build();
         }
 
         @Override
-        public <T> T await(Future<T> future) throws Exception {
+        public <T> T await(CompletableFuture<T> future) throws Exception {
             executor.executeAll();
-            assert future.isCompleted();
-            return future.value().get().get();
+            assert future.isDone();
+            return future.get();
         }
     }
 
@@ -86,8 +84,8 @@ public class ITFileStagingArea {
         @SuppressWarnings("unchecked")
         @Override
         public <T> T getInstance(Class<T> requestedClass) throws InstanceProvisionException {
-            if (ExecutionContext.class.equals(requestedClass)) {
-                return (T) executionContext;
+            if (Executor.class.equals(requestedClass)) {
+                return (T) executor;
             } else {
                 throw new InstanceProvisionException(String.format(
                     "Instance provider ask for unexpected %s.", requestedClass

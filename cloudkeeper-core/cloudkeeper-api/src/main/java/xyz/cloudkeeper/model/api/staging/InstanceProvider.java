@@ -4,7 +4,7 @@ package xyz.cloudkeeper.model.api.staging;
  * Instance provider.
  *
  * <p>This interface is given to other providers as context. For example, a staging-area provider may need access to an
- * executor service with that the newly constructed staging area would schedule asynchronous tasks.
+ * executor to that the newly constructed staging area would submit asynchronous tasks.
  */
 public interface InstanceProvider {
     /**

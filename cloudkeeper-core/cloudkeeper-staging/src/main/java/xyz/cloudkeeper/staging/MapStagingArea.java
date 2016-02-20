@@ -1,8 +1,6 @@
 package xyz.cloudkeeper.staging;
 
-import akka.dispatch.Futures;
-import akka.japi.Option;
-import scala.concurrent.Future;
+import net.florianschoppmann.java.futures.Futures;
 import xyz.cloudkeeper.marshaling.MarshalingTreeNode.ObjectNode;
 import xyz.cloudkeeper.model.api.ExecutionTraceNotFoundException;
 import xyz.cloudkeeper.model.api.RuntimeContext;
@@ -13,16 +11,17 @@ import xyz.cloudkeeper.model.immutable.execution.ExecutionTrace;
 import xyz.cloudkeeper.model.runtime.execution.RuntimeAnnotatedExecutionTrace;
 import xyz.cloudkeeper.model.runtime.execution.RuntimeExecutionTrace;
 
-import javax.annotation.Nullable;
 import java.io.IOException;
 import java.util.AbstractMap;
 import java.util.AbstractSet;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
-import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
+import javax.annotation.Nullable;
 
 /**
  * Simple in-memory staging area backed by a sorted map with keys of type {@link ExecutionTrace}.
@@ -50,11 +49,11 @@ public final class MapStagingArea extends AbstractInMemoryStagingArea {
     }
 
     @Override
-    protected <T> Future<T> toFuture(Callable<T> callable, String format, Object... args) {
+    protected <T> CompletableFuture<T> toFuture(IOCheckedSupplier<T> supplier, String format, Object... args) {
         try {
-            return Futures.successful(callable.call());
-        } catch (Exception exception) {
-            return Futures.failed(new StagingException(
+            return CompletableFuture.completedFuture(supplier.checkedGet());
+        } catch (IOException exception) {
+            return Futures.completedExceptionally(new StagingException(
                 String.format("Failed to %s.", String.format(format, args)),
                 exception
             ));
@@ -150,7 +149,7 @@ public final class MapStagingArea extends AbstractInMemoryStagingArea {
     }
 
     @Override
-    protected Option<Index> getMaximumIndex(RuntimeExecutionTrace trace,
+    protected Optional<Index> getMaximumIndex(RuntimeExecutionTrace trace,
             RuntimeAnnotatedExecutionTrace absoluteAnnotatedTrace, @Nullable Index upperBound) {
         ExecutionTrace absoluteTrace = ExecutionTrace.copyOf(absoluteAnnotatedTrace);
         ExecutionTrace first = absoluteTrace.resolveArrayIndex(Index.index(0));
@@ -158,15 +157,15 @@ public final class MapStagingArea extends AbstractInMemoryStagingArea {
             ? Index.index(Integer.MAX_VALUE)
             : upperBound;
         ExecutionTrace last = absoluteTrace.resolveArrayIndex(lastIndex);
-        Option<Index> optionalIndex;
+        Optional<Index> optionalIndex;
         synchronized (monitor) {
             if (objects.containsKey(last)) {
-                optionalIndex = Option.some(lastIndex);
+                optionalIndex = Optional.of(lastIndex);
             } else {
                 SortedMap<ExecutionTrace, ObjectNode> searchMap = objects.subMap(first, last);
                 optionalIndex = searchMap.isEmpty()
-                    ? Option.<Index>none()
-                    : Option.some(searchMap.lastKey().getIndex());
+                    ? Optional.empty()
+                    : Optional.of(searchMap.lastKey().getIndex());
             }
         }
         return optionalIndex;

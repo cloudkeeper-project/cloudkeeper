@@ -11,14 +11,14 @@ import akka.japi.Creator;
 import akka.testkit.JavaTestKit;
 import akka.testkit.TestActorRef;
 import akka.testkit.TestProbe;
-import akka.util.Timeout;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 import org.testng.Assert;
 import scala.concurrent.Await;
-import scala.concurrent.ExecutionContext;
+import scala.concurrent.ExecutionContextExecutor;
 import scala.concurrent.Future;
 import scala.concurrent.duration.Duration;
+import scala.concurrent.duration.FiniteDuration;
 import xyz.cloudkeeper.interpreter.DependencyGraph.HasValue;
 import xyz.cloudkeeper.interpreter.event.Event;
 import xyz.cloudkeeper.model.api.RuntimeContext;
@@ -46,13 +46,17 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 final class ModuleInterpretation implements AutoCloseable {
-    static final Timeout DEFAULT_TIMEOUT = new Timeout(1, TimeUnit.SECONDS);
+    static final long DEFAULT_TIMEOUT_MILLIS = 1000;
+    static final FiniteDuration DEFAULT_DURATION = Duration.create(DEFAULT_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
     private final CallingThreadExecutor asyncTaskExecutor = new CallingThreadExecutor();
     private final ActorSystem actorSystem;
     private final LocalInterpreterProperties localInterpreterProperties;
@@ -139,7 +143,7 @@ final class ModuleInterpretation implements AutoCloseable {
             Props.create(new ForwardingActor.Factory(parentProbe, asyncTaskExecutor)),
             "supervisor"
         );
-        ExecutionContext asyncExecutionContext = ExecutionContexts.fromExecutor(asyncTaskExecutor);
+        ExecutionContextExecutor asyncExecutionContext = ExecutionContexts.fromExecutor(asyncTaskExecutor);
         localInterpreterProperties = new LocalInterpreterProperties(
             interpreterProperties, builder.executionId, runtimeContext, asyncExecutionContext, eventBus);
 
@@ -230,11 +234,20 @@ final class ModuleInterpretation implements AutoCloseable {
         return Arrays.stream(elements).collect(BitSet::new, BitSet::set, BitSet::or);
     }
 
+    static <T> T await(CompletableFuture<T> future) {
+        try {
+            return future.get(DEFAULT_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException | ExecutionException | TimeoutException exception) {
+            Assert.fail("Future did not complete normally.", exception);
+            throw new AssertionError("unreachable", exception);
+        }
+    }
+
     static <T> T await(Future<T> future) {
         try {
-            return Await.result(future, DEFAULT_TIMEOUT.duration());
+            return Await.result(future, DEFAULT_DURATION);
         } catch (Exception exception) {
-            Assert.fail("Future completed exceptionally.", exception);
+            Assert.fail("Future did not complete normally.", exception);
             throw new AssertionError("unreachable", exception);
         }
     }

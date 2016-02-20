@@ -1,6 +1,5 @@
 package xyz.cloudkeeper.s3;
 
-import akka.japi.Option;
 import cloudkeeper.serialization.ByteSequenceMarshaler;
 import cloudkeeper.types.ByteSequence;
 import com.amazonaws.AmazonClientException;
@@ -12,7 +11,6 @@ import com.amazonaws.services.s3.model.ObjectListing;
 import com.amazonaws.services.s3.model.S3ObjectSummary;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import scala.concurrent.ExecutionContext;
 import xyz.cloudkeeper.model.api.RuntimeContext;
 import xyz.cloudkeeper.model.api.staging.StagingAreaProvider;
 import xyz.cloudkeeper.model.api.staging.StagingException;
@@ -37,6 +35,8 @@ import java.io.OutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.concurrent.Executor;
 
 /**
  * S3-based staging area.
@@ -62,9 +62,9 @@ public final class S3StagingArea extends ExternalStagingArea {
     private final int maxStagingAreaPrefixLength;
 
     private S3StagingArea(RuntimeAnnotatedExecutionTrace executionTrace, RuntimeContext runtimeContext,
-            ExecutionContext executionContext, JAXBContext jaxbContext, S3Connection s3Connection, AmazonS3 s3Client,
+            Executor executor, JAXBContext jaxbContext, S3Connection s3Connection, AmazonS3 s3Client,
             String bucketName, S3Path s3BaseKey, int maxStagingAreaPrefixLength) {
-        super(executionTrace, runtimeContext, executionContext);
+        super(executionTrace, runtimeContext, executor);
         this.jaxbContext = jaxbContext;
         this.s3Connection = s3Connection;
         this.s3Client = s3Client;
@@ -191,7 +191,7 @@ public final class S3StagingArea extends ExternalStagingArea {
     }
 
     @Override
-    protected Option<Index> getMaximumIndex(RuntimeExecutionTrace trace, RuntimeAnnotatedExecutionTrace absoluteTrace,
+    protected Optional<Index> getMaximumIndex(RuntimeExecutionTrace trace, RuntimeAnnotatedExecutionTrace absoluteTrace,
             @Nullable Index upperBound) throws IOException {
         int upperBoundInt = upperBound == null
             ? Integer.MAX_VALUE
@@ -229,14 +229,14 @@ public final class S3StagingArea extends ExternalStagingArea {
             listing = s3Client.listNextBatchOfObjects(listing);
         } while (!listing.getCommonPrefixes().isEmpty() || !listing.getObjectSummaries().isEmpty());
         return maximumIndex >= 0
-            ? Option.some(Index.index(maximumIndex))
-            : Option.<Index>none();
+            ? Optional.of(Index.index(maximumIndex))
+            : Optional.empty();
     }
 
     @Override
     protected S3StagingArea resolveDescendant(RuntimeExecutionTrace trace,
             RuntimeAnnotatedExecutionTrace absoluteTrace) {
-        return new S3StagingArea(absoluteTrace, getRuntimeContext(), getExecutionContext(),
+        return new S3StagingArea(absoluteTrace, getRuntimeContext(), getExecutor(),
             jaxbContext, s3Connection, s3Client, bucketName, toS3Path(trace), maxStagingAreaPrefixLength);
     }
 
@@ -248,8 +248,7 @@ public final class S3StagingArea extends ExternalStagingArea {
      * {@link StagingAreaProvider#provideStaging(RuntimeContext, RuntimeAnnotatedExecutionTrace, xyz.cloudkeeper.model.api.staging.InstanceProvider)}
      * needs to be able to provide instances of the following classes:
      * <ul><li>
-     *     {@link ExecutionContext}: The execution context will be used to execute the futures created by the staging
-     *     area.
+     *     {@link Executor}: The execution context will be used to execute the futures created by the staging area.
      * </li><li>
      *     {@link S3Connection}: An established connection to S3.
      * </li></ul>
@@ -518,7 +517,7 @@ public final class S3StagingArea extends ExternalStagingArea {
         private final S3Connection s3Connection;
         private final String s3Bucket;
         private final RuntimeContext runtimeContext;
-        private final ExecutionContext executionContext;
+        private final Executor executor;
         private String keyPrefix = "";
         private int maxStagingAreaPrefixLength = DEFAULT_MAX_STAGING_AREA_PREFIX_LENGTH;
 
@@ -528,16 +527,16 @@ public final class S3StagingArea extends ExternalStagingArea {
          * @param absoluteTrace absolute execution trace that will correspond to the base path of this staging area
          * @param s3Connection connection to Amazon S3
          * @param s3Bucket S3 bucket for the new staging area
-         * @param executionContext execution context that file-system tasks will be submitted to
+         * @param executor executor that S3-related tasks will be submitted to
          * @param runtimeContext runtime context consisting of CloudKeeper plug-in declarations and Java class loader,
          *     both needed during deserialization
          */
         public Builder(RuntimeAnnotatedExecutionTrace absoluteTrace, S3Connection s3Connection,
-                String s3Bucket, ExecutionContext executionContext, RuntimeContext runtimeContext) {
+                String s3Bucket, Executor executor, RuntimeContext runtimeContext) {
             this.absoluteTrace = Objects.requireNonNull(absoluteTrace);
             this.s3Connection = Objects.requireNonNull(s3Connection);
             this.s3Bucket = Objects.requireNonNull(s3Bucket);
-            this.executionContext = Objects.requireNonNull(executionContext);
+            this.executor = Objects.requireNonNull(executor);
             this.runtimeContext = Objects.requireNonNull(runtimeContext);
         }
 
@@ -585,7 +584,7 @@ public final class S3StagingArea extends ExternalStagingArea {
          * @return the new staging area
          */
         public ExternalStagingArea build() {
-            return new S3StagingArea(absoluteTrace, runtimeContext, executionContext, jaxbContext(), s3Connection,
+            return new S3StagingArea(absoluteTrace, runtimeContext, executor, jaxbContext(), s3Connection,
                 s3Connection.getS3Client(), s3Bucket, toS3Path(S3Path.empty(keyPrefix), absoluteTrace),
                 maxStagingAreaPrefixLength);
         }

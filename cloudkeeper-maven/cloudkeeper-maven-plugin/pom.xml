@@ -179,20 +179,6 @@
         </dependency>
 
         <dependency>
-            <!-- Needed for ExecutionContexts#fromExecutorService(ExecutorService) and  -->
-            <groupId>com.typesafe.akka</groupId>
-            <artifactId>akka-actor_2.11</artifactId>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
-            <!-- Needed for ExecutionContext, Futures#await(), etc. -->
-            <groupId>org.scala-lang</groupId>
-            <artifactId>scala-library</artifactId>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-simple</artifactId>
             <scope>test</scope>

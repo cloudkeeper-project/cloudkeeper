@@ -4,14 +4,9 @@ import akka.actor.ActorRef;
 import akka.actor.PoisonPill;
 import akka.actor.Terminated;
 import akka.actor.UntypedActor;
-import akka.dispatch.Futures;
-import akka.dispatch.Mapper;
-import akka.dispatch.OnSuccess;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
 import akka.japi.Creator;
-import akka.japi.Option;
-import scala.concurrent.Future;
 import xyz.cloudkeeper.model.api.staging.StagingArea;
 import xyz.cloudkeeper.model.bare.element.module.BareLoopModule;
 import xyz.cloudkeeper.model.immutable.element.Index;
@@ -22,6 +17,7 @@ import xyz.cloudkeeper.model.runtime.element.module.RuntimeInPort;
 import xyz.cloudkeeper.model.runtime.element.module.RuntimeLoopModule;
 import xyz.cloudkeeper.model.runtime.element.module.RuntimeOutPort;
 import xyz.cloudkeeper.model.runtime.execution.RuntimeExecutionTrace;
+import net.florianschoppmann.java.futures.Futures;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
@@ -34,6 +30,7 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Interpreter of loop modules.
@@ -101,12 +98,12 @@ final class LoopModuleInterpreterActor extends AbstractModuleInterpreterActor {
     /**
      * The iteration the child actor {@link #iterationActorRef} is currently interpreting.
      */
-    private Index currentIteration = null;
+    @Nullable private Index currentIteration = null;
 
     /**
-     * Reference to actor that interpretes the current iteration.
+     * Reference to actor that interprets the current iteration.
      */
-    private ActorRef iterationActorRef = null;
+    @Nullable private ActorRef iterationActorRef = null;
 
     private enum State {
         /**
@@ -251,14 +248,9 @@ final class LoopModuleInterpreterActor extends AbstractModuleInterpreterActor {
             ExecutionTrace fromTrace = ExecutionTrace.empty().resolveInPort(inPortName);
             ExecutionTrace toTrace
                 = ExecutionTrace.empty().resolveContent().resolveIteration(Index.index(0)).resolveInPort(inPortName);
-            Future<Object> messageFuture = stagingArea
+            CompletableFuture<Object> messageFuture = stagingArea
                 .copy(fromTrace, toTrace)
-                .map(new Mapper<RuntimeExecutionTrace, Object>() {
-                    @Override
-                    public Object apply(RuntimeExecutionTrace ignored) {
-                        return new CopiedInPortToFirstIteration(inPortId);
-                    }
-                }, getAsyncTaskContext());
+                .thenApply(ignored -> new CopiedInPortToFirstIteration(inPortId));
             pipeResultToSelf(messageFuture, "copying value for in-port %s to first iteration",
                 inPort.getSimpleName());
         } else {
@@ -270,16 +262,13 @@ final class LoopModuleInterpreterActor extends AbstractModuleInterpreterActor {
     }
 
     private void findNextResumeCandidate() {
-        Future<Object> messageFuture = stagingArea
+        CompletableFuture<Object> messageFuture = stagingArea
             .getMaximumIndex(ExecutionTrace.empty().resolveContent(), startIteration)
-            .map(new Mapper<Option<Index>, Object>() {
-                @Override
-                public Object apply(Option<Index> optionalMaximumIteration) {
-                    return optionalMaximumIteration.isEmpty()
-                        ? new IterationStatus(Index.index(0), false)
-                        : new FoundIterationInStagingArea(optionalMaximumIteration.get());
-                }
-            }, getAsyncTaskContext());
+            .thenApply(
+                optionalMaxIteration -> optionalMaxIteration.isPresent()
+                    ? new FoundIterationInStagingArea(optionalMaxIteration.get())
+                    : new IterationStatus(Index.index(0), false)
+            );
         pipeResultToSelf(messageFuture, "finding iteration to resume execution from");
     }
 
@@ -310,7 +299,7 @@ final class LoopModuleInterpreterActor extends AbstractModuleInterpreterActor {
         BitSet copyableInPorts = (BitSet) requiredInPortsForIterations.clone();
         copyableInPorts.andNot(recomputedInPorts);
 
-        List<Future<RuntimeExecutionTrace>> futures = new ArrayList<>(copyableInPorts.cardinality());
+        List<CompletableFuture<Void>> futures = new ArrayList<>(copyableInPorts.cardinality());
         for (
             int inPortId = copyableInPorts.nextSetBit(0);
             inPortId >= 0;
@@ -319,24 +308,16 @@ final class LoopModuleInterpreterActor extends AbstractModuleInterpreterActor {
             final SimpleName inPortName = inPorts.get(inPortId).getSimpleName();
             final RuntimeExecutionTrace iterationInPortTrace
                 = ExecutionTrace.empty().resolveIteration(firstIteration).resolveInPort(inPortName);
-            Future<RuntimeExecutionTrace> future = stagingArea.exists(iterationInPortTrace)
-                .flatMap(new Mapper<Boolean, Future<RuntimeExecutionTrace>>() {
-                    @Override
-                    public Future<RuntimeExecutionTrace> apply(Boolean exists) {
-                        return exists
-                            ? Futures.successful(iterationInPortTrace)
-                            : stagingArea.copy(ExecutionTrace.empty().resolveInPort(inPortName), iterationInPortTrace);
-                    }
-                }, getAsyncTaskContext());
+            CompletableFuture<Void> future = stagingArea.exists(iterationInPortTrace)
+                .thenCompose(
+                    exists -> exists
+                        ? CompletableFuture.completedFuture(null)
+                        : stagingArea.copy(ExecutionTrace.empty().resolveInPort(inPortName), iterationInPortTrace)
+                );
             futures.add(future);
         }
-        Future<Object> messageFuture = Futures.sequence(futures, getAsyncTaskContext())
-            .map(new Mapper<Iterable<RuntimeExecutionTrace>, Object>() {
-                @Override
-                public Object apply(Iterable<RuntimeExecutionTrace> ignored) {
-                    return new IterationStatus(firstIteration, true);
-                }
-            }, getAsyncTaskContext());
+        CompletableFuture<Object> messageFuture = Futures.collect(futures)
+            .thenApply(ignored -> new IterationStatus(firstIteration, true));
         pipeResultToSelf(messageFuture, "starting first loop iteration (index 0)");
     }
 
@@ -357,7 +338,7 @@ final class LoopModuleInterpreterActor extends AbstractModuleInterpreterActor {
         startIteration = iteration;
 
         List<? extends RuntimeInPort> inPorts = module.getInPorts();
-        List<Future<Boolean>> futures = new ArrayList<>(module.getInPorts().size());
+        List<CompletableFuture<Boolean>> futures = new ArrayList<>(module.getInPorts().size());
         for (
             int inPortId = requiredInPortsForIterations.nextSetBit(0);
             inPortId >= 0;
@@ -367,20 +348,17 @@ final class LoopModuleInterpreterActor extends AbstractModuleInterpreterActor {
                 ExecutionTrace.empty().resolveIteration(iteration).resolveInPort(inPorts.get(inPortId).getSimpleName())
             ));
         }
-        Future<Object> messageFuture = Futures.sequence(futures, getAsyncTaskContext())
-            .map(new Mapper<Iterable<Boolean>, Object>() {
-                @Override
-                public Object apply(Iterable<Boolean> hasValuesIterable) {
-                    boolean hasAllInputs = true;
-                    for (boolean hasValue: hasValuesIterable) {
-                        if (!hasValue) {
-                            hasAllInputs = false;
-                            break;
-                        }
+        CompletableFuture<Object> messageFuture = Futures.collect(futures)
+            .thenApply(hasValuesList -> {
+                boolean hasAllInputs = true;
+                for (boolean hasValue: hasValuesList) {
+                    if (!hasValue) {
+                        hasAllInputs = false;
+                        break;
                     }
-                    return new IterationStatus(iteration, hasAllInputs);
                 }
-            }, getAsyncTaskContext());
+                return new IterationStatus(iteration, hasAllInputs);
+            });
         pipeResultToSelf(messageFuture, "examining whether interpretation can be resumed from iteration %s",
             iteration);
     }
@@ -414,8 +392,9 @@ final class LoopModuleInterpreterActor extends AbstractModuleInterpreterActor {
             ),
             iteration.toString()
         );
-        getContext().watch(iterationActorRef);
+        assert iterationActorRef != null;
         currentIteration = iteration;
+        getContext().watch(iterationActorRef);
 
         for (
             int inPortId = inPortsInNeedOfMessage.nextSetBit(0);
@@ -476,7 +455,7 @@ final class LoopModuleInterpreterActor extends AbstractModuleInterpreterActor {
         int iterationInt = iteration.intValue();
         Index previousIteration = Index.index(iterationInt - 1);
         List<? extends RuntimeInPort> inPorts = module.getInPorts();
-        List<Future<RuntimeExecutionTrace>> copyFutures = new ArrayList<>(inPorts.size());
+        List<CompletableFuture<Void>> copyFutures = new ArrayList<>(inPorts.size());
         for (
             int inPortId = requiredInPortsForIterations.nextSetBit(0);
             inPortId >= 0;
@@ -492,13 +471,8 @@ final class LoopModuleInterpreterActor extends AbstractModuleInterpreterActor {
 
             copyFutures.add(stagingArea.copy(copyFrom, copyTo));
         }
-        Future<Object> messageFuture = Futures.sequence(copyFutures, getAsyncTaskContext())
-            .map(new Mapper<Iterable<RuntimeExecutionTrace>, Object>() {
-                @Override
-                public Object apply(Iterable<RuntimeExecutionTrace> ignored) {
-                    return new IterationStatus(iteration, true);
-                }
-            }, getAsyncTaskContext());
+        CompletableFuture<Object> messageFuture = Futures.collect(copyFutures)
+            .thenApply(ignored -> new IterationStatus(iteration, true));
         pipeResultToSelf(messageFuture, "copying inputs for iteration %s", iteration);
     }
 
@@ -511,7 +485,7 @@ final class LoopModuleInterpreterActor extends AbstractModuleInterpreterActor {
      */
     private void finished(Index iteration) {
         List<? extends RuntimeOutPort> outPorts = module.getOutPorts();
-        List<Future<RuntimeExecutionTrace>> copyFutures = new ArrayList<>(outPorts.size());
+        List<CompletableFuture<Void>> copyFutures = new ArrayList<>(outPorts.size());
         for (
             int outPortId = requestedOutPorts.nextSetBit(0);
             outPortId >= 0;
@@ -522,29 +496,21 @@ final class LoopModuleInterpreterActor extends AbstractModuleInterpreterActor {
                 .resolveOutPort(outPortName);
             ExecutionTrace copyTo = ExecutionTrace.empty().resolveOutPort(outPortName);
 
-            Future<RuntimeExecutionTrace> copyFuture = stagingArea.copy(copyFrom, copyTo);
+            CompletableFuture<Void> copyFuture = stagingArea.copy(copyFrom, copyTo);
             int finalOutPortId = outPortId;
             // We send the SubmoduleOutPortHasSignal messages individually because out-port value may vary greatly in
             // size, and copying may thus take widely different amounts of times.
             ActorRef parent = getContext().parent();
-            copyFuture.onSuccess(new OnSuccess<RuntimeExecutionTrace>() {
-                @Override
-                public void onSuccess(RuntimeExecutionTrace runtimeExecutionTrace) {
-                    parent.tell(
-                        new InterpreterInterface.SubmoduleOutPortHasSignal(getModuleId(), finalOutPortId),
-                        getSelf()
-                    );
-                }
-            }, getAsyncTaskContext());
+            copyFuture.thenRun(
+                () -> parent.tell(
+                    new InterpreterInterface.SubmoduleOutPortHasSignal(getModuleId(), finalOutPortId),
+                    getSelf()
+                )
+            );
             copyFutures.add(copyFuture);
         }
-        Future<LocalMessages> messageFuture = Futures.sequence(copyFutures, getAsyncTaskContext())
-            .map(new Mapper<Iterable<RuntimeExecutionTrace>, LocalMessages>() {
-                @Override
-                public LocalMessages apply(Iterable<RuntimeExecutionTrace> ignored) {
-                    return LocalMessages.PREPARE_TO_TERMINATE;
-                }
-            }, getAsyncTaskContext());
+        CompletableFuture<LocalMessages> messageFuture = Futures.collect(copyFutures)
+            .thenApply(ignore -> LocalMessages.PREPARE_TO_TERMINATE);
         pipeResultToSelf(messageFuture, "copying outputs from iteration %s", iteration);
     }
 
@@ -563,22 +529,21 @@ final class LoopModuleInterpreterActor extends AbstractModuleInterpreterActor {
         if (childActor == iterationActorRef) {
             state = State.RUNNING;
 
-            final Index finishedIteration = currentIteration;
+            // We set the current iteration immediately after child actor was created, hence it must not be null.
+            assert currentIteration != null;
+            Index finishedIteration = currentIteration;
             iterationActorRef = null;
             currentIteration = null;
 
             ExecutionTrace continueTrace = ExecutionTrace.empty()
                 .resolveContent().resolveIteration(finishedIteration)
                 .resolveOutPort(SimpleName.identifier(BareLoopModule.CONTINUE_PORT_NAME));
-            Future<Object> messageFuture = stagingArea.getObject(continueTrace)
-                .map(new Mapper<Object, Object>() {
-                    @Override
-                    public Object apply(Object shouldContinue) {
-                        return (boolean) shouldContinue
-                            ? new CopyInputsForIteration(Index.index(finishedIteration.intValue() + 1))
-                            : new FinishedLastIteration(finishedIteration);
-                    }
-                }, getAsyncTaskContext());
+            CompletableFuture<Object> messageFuture = stagingArea.getObject(continueTrace)
+                .thenApply(
+                    shouldContinue -> (boolean) shouldContinue
+                        ? new CopyInputsForIteration(Index.index(finishedIteration.intValue() + 1))
+                        : new FinishedLastIteration(finishedIteration)
+                );
             pipeResultToSelf(messageFuture, "examining value at %s", continueTrace);
         } else {
             log.warning(String.format("Ignoring terminated message for unknown child actor %s.", childActor));

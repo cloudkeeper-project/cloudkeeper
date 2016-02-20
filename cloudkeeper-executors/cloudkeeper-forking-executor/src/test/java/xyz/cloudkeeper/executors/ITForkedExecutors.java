@@ -1,13 +1,9 @@
 package xyz.cloudkeeper.executors;
 
-import akka.dispatch.ExecutionContexts;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-import scala.concurrent.Await;
-import scala.concurrent.ExecutionContext;
-import scala.concurrent.duration.Duration;
 import xyz.cloudkeeper.dsl.Module;
 import xyz.cloudkeeper.examples.modules.Decrease;
 import xyz.cloudkeeper.filesystem.FileStagingArea;
@@ -30,6 +26,7 @@ import xyz.cloudkeeper.simple.LocalSimpleModuleExecutor;
 import xyz.cloudkeeper.simple.PrefetchingModuleConnectorProvider;
 import xyz.cloudkeeper.simple.SimpleInstanceProvider;
 
+import javax.annotation.Nullable;
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -40,26 +37,26 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 public class ITForkedExecutors {
-    private static final Duration AWAIT_DURATION = Duration.create(1, TimeUnit.SECONDS);
+    private static final long AWAIT_DURATION_MILLIS = 1000;
 
-    private Path tempDir;
-    private ExecutorService executorService;
-    private ExecutionContext executionContext;
+    @Nullable private Path tempDir;
+    @Nullable private ExecutorService executorService;
 
     @BeforeClass
     public void setup() throws IOException {
         tempDir = Files.createTempDirectory(getClass().getName());
         executorService = Executors.newCachedThreadPool();
-        executionContext = ExecutionContexts.fromExecutorService(executorService);
     }
 
     @AfterClass
     public void tearDown() throws IOException {
+        assert tempDir != null && executorService != null;
         executorService.shutdownNow();
         Files.walkFileTree(tempDir, RecursiveDeleteVisitor.getInstance());
     }
@@ -95,12 +92,18 @@ public class ITForkedExecutors {
         }
     }
 
+    private static <T> T await(CompletableFuture<T> future) throws Exception {
+        return future.get(AWAIT_DURATION_MILLIS, TimeUnit.MILLISECONDS);
+    }
+
     @Test
     public void testExecution() throws Exception {
-        DSLRuntimeContextFactory runtimeContextFactory = new DSLRuntimeContextFactory.Builder(executionContext).build();
+        assert executorService != null;
+
+        DSLRuntimeContextFactory runtimeContextFactory = new DSLRuntimeContextFactory.Builder(executorService).build();
         URI bundleURI = new URI(Module.URI_SCHEME, Decrease.class.getName(), null);
-        try (RuntimeContext runtimeContext = Await.result(
-                runtimeContextFactory.newRuntimeContext(Collections.singletonList(bundleURI)), AWAIT_DURATION)) {
+        try (RuntimeContext runtimeContext
+                 = await(runtimeContextFactory.newRuntimeContext(Collections.singletonList(bundleURI)))) {
             RuntimeAnnotatedExecutionTrace rootTrace = runtimeContext.newAnnotatedExecutionTrace(
                 ExecutionTrace.empty(),
                 new MutableProxyModule().setDeclaration(Decrease.class.getName()),
@@ -109,38 +112,28 @@ public class ITForkedExecutors {
 
             Path stagingAreaBasePath = Files.createDirectory(tempDir.resolve("staging-area"));
             StagingArea stagingArea = new FileStagingArea.Builder(runtimeContext, rootTrace,
-                    stagingAreaBasePath, executionContext)
+                    stagingAreaBasePath, executorService)
                 .build();
-            Await.result(
-                stagingArea.putObject(ExecutionTrace.empty().resolveInPort(SimpleName.identifier("num")), 5),
-                AWAIT_DURATION
-            );
+            await(stagingArea.putObject(ExecutionTrace.empty().resolveInPort(SimpleName.identifier("num")), 5));
 
             RuntimeStateProvider runtimeStateProvider = RuntimeStateProvider.of(runtimeContext, stagingArea);
 
-            InstanceProvider instanceProvider = new SimpleInstanceProvider.Builder(executionContext)
+            InstanceProvider instanceProvider = new SimpleInstanceProvider.Builder(executorService)
                 .setRuntimeContextFactory(runtimeContextFactory)
                 .build();
-            ModuleConnectorProvider moduleConnectorProvider
-                = new PrefetchingModuleConnectorProvider(tempDir, executionContext);
+            ModuleConnectorProvider moduleConnectorProvider = new PrefetchingModuleConnectorProvider(tempDir);
             SimpleModuleExecutor simpleModuleExecutor
-                    = new LocalSimpleModuleExecutor.Builder(executionContext, moduleConnectorProvider)
+                    = new LocalSimpleModuleExecutor.Builder(executorService, moduleConnectorProvider)
                 .setInstanceProvider(instanceProvider)
                 .build();
 
             // Finally, run the simple module
             SimpleModuleExecutorResult result = run(simpleModuleExecutor, runtimeStateProvider);
-
-            if (result.getExecutionException().isDefined()) {
-                Assert.fail("Module execution failed.", result.getExecutionException().get());
-            }
+            Assert.assertNull(result.getExecutionException(), "Module execution failed.");
 
             // Sanity check that the correct out-port value was produced
             Assert.assertEquals(
-                Await.result(
-                    stagingArea.getObject(ExecutionTrace.empty().resolveOutPort(SimpleName.identifier("result"))),
-                    AWAIT_DURATION
-                ),
+                await(stagingArea.getObject(ExecutionTrace.empty().resolveOutPort(SimpleName.identifier("result")))),
                 4
             );
         }

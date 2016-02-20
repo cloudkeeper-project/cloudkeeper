@@ -2,7 +2,6 @@ package xyz.cloudkeeper.interpreter;
 
 import akka.actor.ActorRef;
 import akka.util.Timeout;
-import scala.concurrent.ExecutionContext;
 import xyz.cloudkeeper.model.api.CloudKeeperEnvironment;
 import xyz.cloudkeeper.model.api.RuntimeContext;
 import xyz.cloudkeeper.model.api.RuntimeContextFactory;
@@ -14,6 +13,7 @@ import xyz.cloudkeeper.model.util.ImmutableList;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -26,14 +26,14 @@ public final class CloudKeeperEnvironmentBuilder {
      */
     public static final String DEFAULT_INSTANCE_PROVIDER_ACTOR_PATH = "cloudkeeper/instance-provider";
 
-    private final ExecutionContext executionContext;
+    private final Executor executor;
     private String instanceProviderActorPath = DEFAULT_INSTANCE_PROVIDER_ACTOR_PATH;
     private final InstanceProvider instanceProvider;
     private InterpreterPropsProvider interpreterPropsProvider = DefaultInterpreterPropsProvider.INSTANCE;
     private final StagingAreaProvider stagingAreaProvider;
     private final ActorRef administrator;
     private final ActorRef masterInterpreter;
-    private final ActorRef executor;
+    private final ActorRef simpleModuleExecutor;
     private boolean cleaningRequested = true;
     private boolean retrieveResults = true;
 
@@ -56,26 +56,25 @@ public final class CloudKeeperEnvironmentBuilder {
      * interpreter and executors will instead query the instance-provider actor (configurable with
      * {@link #setInstanceProviderActorPath(String)}) for an {@link InstanceProvider} instance.
      *
-     * @param executionContext the execution context that the CloudKeeper workflow execution will use for scheduling
-     *     internal asynchronous tasks (futures)
+     * @param executor the executor that the CloudKeeper workflow execution will use for scheduling internal
+     *     asynchronous tasks (e.g., completion stages/futures)
      * @param administrator actor in the current JVM that will listen to messages from the master interpreter and its
      *     delegates
-     * @param masterInterpreter Master interpreter that does not have to reside in the current JVM. This actor will
-     *     be sent workflow execution requests.
-     * @param executor Simple-module executor actor that does not have to reside in the current JVM. The actor
-     *     reference will be included in the workflow execution request sent to {@code masterInterpreter}.
+     * @param masterInterpreter Master interpreter actor that does not have to reside in the current JVM. This actor
+     *     will be sent workflow execution requests.
+     * @param simpleModuleExecutor Simple-module executor actor that does not have to reside in the current JVM. The
+     *     actor reference will be included in the workflow execution request sent to {@code masterInterpreter}.
      * @param instanceProvider instance provider that provides the {@link RuntimeContextFactory} and that will be passed
      *     to the staging-area provider (see
      *     {@link StagingAreaProvider#provideStaging(RuntimeContext, RuntimeAnnotatedExecutionTrace, InstanceProvider)})
      * @param stagingAreaProvider staging-area provider
      */
-    public CloudKeeperEnvironmentBuilder(ExecutionContext executionContext, ActorRef administrator,
-            ActorRef masterInterpreter, ActorRef executor, InstanceProvider instanceProvider,
-            StagingAreaProvider stagingAreaProvider) {
-        this.executionContext = Objects.requireNonNull(executionContext);
+    public CloudKeeperEnvironmentBuilder(Executor executor, ActorRef administrator, ActorRef masterInterpreter,
+            ActorRef simpleModuleExecutor, InstanceProvider instanceProvider, StagingAreaProvider stagingAreaProvider) {
+        this.executor = Objects.requireNonNull(executor);
         this.administrator = Objects.requireNonNull(administrator);
         this.masterInterpreter = Objects.requireNonNull(masterInterpreter);
-        this.executor = Objects.requireNonNull(executor);
+        this.simpleModuleExecutor = Objects.requireNonNull(simpleModuleExecutor);
         this.instanceProvider = Objects.requireNonNull(instanceProvider);
         this.stagingAreaProvider = Objects.requireNonNull(stagingAreaProvider);
     }
@@ -183,8 +182,8 @@ public final class CloudKeeperEnvironmentBuilder {
      * @return new CloudKeeper environment
      */
     public CloudKeeperEnvironment build() {
-        return new CloudKeeperEnvironmentImpl(executionContext, instanceProviderActorPath, instanceProvider,
-            interpreterPropsProvider, stagingAreaProvider, administrator, masterInterpreter, executor,
+        return new CloudKeeperEnvironmentImpl(executor, instanceProviderActorPath, instanceProvider,
+            interpreterPropsProvider, stagingAreaProvider, administrator, masterInterpreter, simpleModuleExecutor,
             eventSubscriptions, cleaningRequested, retrieveResults, remoteAskTimeout, localAskTimeout);
     }
 }

@@ -1,11 +1,8 @@
 package xyz.cloudkeeper.staging;
 
-import akka.dispatch.Futures;
-import akka.dispatch.Mapper;
 import cloudkeeper.serialization.StringMarshaler;
 import cloudkeeper.types.ByteSequence;
-import scala.concurrent.ExecutionContext;
-import scala.concurrent.Future;
+import net.florianschoppmann.java.futures.Futures;
 import xyz.cloudkeeper.marshaling.DelegatingMarshalContext;
 import xyz.cloudkeeper.marshaling.DelegatingUnmarshalContext;
 import xyz.cloudkeeper.marshaling.MarshalTarget;
@@ -16,7 +13,6 @@ import xyz.cloudkeeper.model.api.MarshalingException;
 import xyz.cloudkeeper.model.api.RuntimeContext;
 import xyz.cloudkeeper.model.api.UnmarshalContext;
 import xyz.cloudkeeper.model.api.staging.StagingException;
-import xyz.cloudkeeper.model.api.util.ScalaFutures;
 import xyz.cloudkeeper.model.bare.element.serialization.BareSerializationDeclaration;
 import xyz.cloudkeeper.model.immutable.element.Key;
 import xyz.cloudkeeper.model.immutable.element.Name;
@@ -32,7 +28,6 @@ import xyz.cloudkeeper.model.runtime.execution.RuntimeAnnotatedExecutionTrace;
 import xyz.cloudkeeper.model.runtime.execution.RuntimeExecutionTrace;
 import xyz.cloudkeeper.model.util.ImmutableList;
 
-import javax.annotation.Nullable;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
@@ -40,7 +35,10 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.Executor;
+import javax.annotation.Nullable;
 
 /**
  * Abstract staging area that is backed by some external storage.
@@ -51,16 +49,16 @@ import java.util.concurrent.Callable;
 public abstract class ExternalStagingArea extends AbstractStagingArea {
     private final RuntimeContext runtimeContext;
     private final RuntimeSerializationDeclaration stringSerialization;
-    private final ExecutionContext executionContext;
+    private final Executor executor;
 
     protected ExternalStagingArea(RuntimeAnnotatedExecutionTrace executionTrace, RuntimeContext runtimeContext,
-            ExecutionContext executionContext) {
+            Executor executor) {
         super(executionTrace);
         this.runtimeContext = runtimeContext;
         stringSerialization = Objects.requireNonNull(runtimeContext.getRepository().getElement(
             RuntimeSerializationDeclaration.class, Name.qualifiedName(StringMarshaler.class.getName())
         ));
-        this.executionContext = executionContext;
+        this.executor = executor;
     }
 
     /**
@@ -75,30 +73,24 @@ public abstract class ExternalStagingArea extends AbstractStagingArea {
     }
 
     /**
-     * Returns the execution context of this staging area
+     * Returns the executor of this staging area
      *
-     * @return the execution context of this staging area
+     * @return the executor of this staging area
      */
-    public ExecutionContext getExecutionContext() {
-        return executionContext;
+    public Executor getExecutor() {
+        return executor;
     }
 
     @Override
-    protected final <T> Future<T> toFuture(Callable<T> callable, String format, Object... args) {
-        return Futures.future(callable, executionContext)
-            .transform(
-                ScalaFutures.identityMapper(),
-                new Mapper<Throwable, Throwable>() {
-                    @Override
-                    public Throwable apply(Throwable throwable) {
-                        return new StagingException(
-                            String.format("Failed to %s.", String.format(format, args)),
-                            throwable
-                        );
-                    }
-                },
-                executionContext
-            );
+    protected final <T> CompletableFuture<T> toFuture(IOCheckedSupplier<T> supplier, String format, Object... args) {
+        CompletionStage<T> completionStage = Futures.supplyAsync(supplier, executor);
+        return Futures.translateException(
+            completionStage,
+            throwable -> new StagingException(
+                String.format("Failed to %s.", String.format(format, args)),
+                Futures.unwrapCompletionException(throwable)
+            )
+        );
     }
 
     /**

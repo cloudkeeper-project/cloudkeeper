@@ -1,10 +1,5 @@
 package xyz.cloudkeeper.drm;
 
-import akka.dispatch.Futures;
-import akka.dispatch.Mapper;
-import akka.dispatch.OnComplete;
-import akka.dispatch.Recover;
-import akka.japi.Option;
 import org.ggf.drmaa.DrmaaException;
 import org.ggf.drmaa.ExitTimeoutException;
 import org.ggf.drmaa.FileTransferMode;
@@ -13,9 +8,6 @@ import org.ggf.drmaa.JobTemplate;
 import org.ggf.drmaa.Session;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import scala.concurrent.ExecutionContext;
-import scala.concurrent.Future;
-import scala.concurrent.Promise;
 import xyz.cloudkeeper.executors.CommandLines;
 import xyz.cloudkeeper.executors.CommandProvider;
 import xyz.cloudkeeper.model.LinkerException;
@@ -31,6 +23,7 @@ import xyz.cloudkeeper.model.immutable.element.Name;
 import xyz.cloudkeeper.model.immutable.element.SimpleName;
 import xyz.cloudkeeper.model.runtime.element.module.RuntimeProxyModule;
 import xyz.cloudkeeper.model.runtime.execution.RuntimeAnnotatedExecutionTrace;
+import net.florianschoppmann.java.futures.Futures;
 import xyz.cloudkeeper.model.util.ImmutableList;
 import xyz.cloudkeeper.simple.CharacterStreamCommunication.Splitter;
 import xyz.cloudkeeper.simple.SimpleInstanceProvider;
@@ -46,6 +39,10 @@ import java.text.Normalizer;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
@@ -55,13 +52,13 @@ import java.util.regex.Pattern;
  * execute simple modules.
  *
  * <p>This executor submits a new {@link JobTemplate} to the DRMAA {@link Session} configured at construction time. It
- * serializes the {@link RuntimeStateProvider} instance passed to {@link #submit(RuntimeStateProvider, Future)} into a
- * file that will be configured (with {@link JobTemplate#setInputPath(String)}) to provide the standard input for the
- * submitted job. The distributed resource manager schedules and executes the configured command so that the
- * standard-out stream of the job is written to the file configured with {@link JobTemplate#setOutputPath(String)}. This
- * executor subsequently deserializes the {@link SimpleModuleExecutorResult} from there. The standard-error stream of
- * the job will (temporarily) be written to a file configured with {@link JobTemplate#setErrorPath(String)}.
- * Subsequently, it will be logged to the standard-error stream of the current process.
+ * serializes the {@link RuntimeStateProvider} instance passed to {@link #submit(RuntimeStateProvider)} into a file that
+ * will be configured (with {@link JobTemplate#setInputPath(String)}) to provide the standard input for the submitted
+ * job. The distributed resource manager schedules and executes the configured command so that the standard-out stream
+ * of the job is written to the file configured with {@link JobTemplate#setOutputPath(String)}. This executor
+ * subsequently deserializes the {@link SimpleModuleExecutorResult} from there. The standard-error stream of the job
+ * will (temporarily) be written to a file configured with {@link JobTemplate#setErrorPath(String)}. Subsequently, it
+ * will be logged to the standard-error stream of the current process.
  */
 public final class DrmaaSimpleModuleExecutor implements SimpleModuleExecutor {
     /**
@@ -108,7 +105,7 @@ public final class DrmaaSimpleModuleExecutor implements SimpleModuleExecutor {
     private final CommandProvider commandProvider;
     private final long waitTimeoutSeconds;
     private final long errorWaitMilliseconds;
-    private final ExecutionContext shortLivedExecutionContext;
+    private final Executor shortTasksExecutor;
     private final ScheduledExecutorService longLivedExecutorService;
     private final InstanceProvider instanceProvider;
     private final NativeSpecificationProvider nativeSpecificationProvider;
@@ -117,12 +114,11 @@ public final class DrmaaSimpleModuleExecutor implements SimpleModuleExecutor {
 
     private boolean waitTaskIsRunning = false;
 
-    private final WaitForJobMapper waitForJobMapper = new WaitForJobMapper();
     private final WaitForNextJobTask waitForNextJobTask = new WaitForNextJobTask();
 
     private DrmaaSimpleModuleExecutor(Session drmaaSession, Path jobIOBasePath, CommandProvider commandProvider,
             NativeSpecificationProvider nativeSpecificationProvider, InstanceProvider instanceProvider,
-            long waitTimeoutSeconds, long errorWaitMilliseconds, ExecutionContext shortLivedExecutionContext,
+            long waitTimeoutSeconds, long errorWaitMilliseconds, Executor shortTasksExecutor,
             ScheduledExecutorService longLivedExecutorService) {
         this.drmaaSession = drmaaSession;
         this.jobIOBasePath = jobIOBasePath;
@@ -131,7 +127,7 @@ public final class DrmaaSimpleModuleExecutor implements SimpleModuleExecutor {
         this.instanceProvider = instanceProvider;
         this.waitTimeoutSeconds = waitTimeoutSeconds;
         this.errorWaitMilliseconds = errorWaitMilliseconds;
-        this.shortLivedExecutionContext = shortLivedExecutionContext;
+        this.shortTasksExecutor = shortTasksExecutor;
         this.longLivedExecutorService = longLivedExecutorService;
     }
 
@@ -151,7 +147,7 @@ public final class DrmaaSimpleModuleExecutor implements SimpleModuleExecutor {
         private final Session session;
         private final Path jobIOBasePath;
         private final CommandProvider commandProvider;
-        private final ExecutionContext shortLivedExecutionContext;
+        private final Executor shortTasksExecutor;
         private final ScheduledExecutorService longLivedExecutorService;
         @Nullable private NativeSpecificationProvider nativeSpecificationProvider = null;
         @Nullable private InstanceProvider instanceProvider = null;
@@ -161,7 +157,7 @@ public final class DrmaaSimpleModuleExecutor implements SimpleModuleExecutor {
         /**
          * Constructor.
          *
-         * <p>Typically, {@code shortLivedExecutionContext} should not be the same executor service as
+         * <p>Typically, {@code shortTasksExecutor} should not be the same executor service as
          * {@code longLivedExecutionContext}. Otherwise, a deadlock situation may arise when the
          * cancellation could only execute after the process has terminated.
          *
@@ -169,17 +165,16 @@ public final class DrmaaSimpleModuleExecutor implements SimpleModuleExecutor {
          * @param jobIOBasePath base path where job-specific directories will be created (that will contain stdin,
          *     stdout, and stderr of submitted jobs)
          * @param commandProvider provider of the command-line
-         * @param shortLivedExecutionContext execution context that will be used to execute short-lived asynchronous
-         *     tasks
+         * @param shortTasksExecutor executor that will be used to execute short-lived asynchronous tasks
          * @param longLivedExecutorService executor service that will be used to execute potentially long-lived tasks
          *     that make blocking calls to {@link Session#wait(String, long)}
          */
         public Builder(Session session, Path jobIOBasePath, CommandProvider commandProvider,
-                ExecutionContext shortLivedExecutionContext, ScheduledExecutorService longLivedExecutorService) {
+                Executor shortTasksExecutor, ScheduledExecutorService longLivedExecutorService) {
             this.session = Objects.requireNonNull(session);
             this.jobIOBasePath = Objects.requireNonNull(jobIOBasePath);
             this.commandProvider = Objects.requireNonNull(commandProvider);
-            this.shortLivedExecutionContext = Objects.requireNonNull(shortLivedExecutionContext);
+            this.shortTasksExecutor = Objects.requireNonNull(shortTasksExecutor);
             this.longLivedExecutorService = Objects.requireNonNull(longLivedExecutorService);
         }
 
@@ -200,8 +195,8 @@ public final class DrmaaSimpleModuleExecutor implements SimpleModuleExecutor {
         /**
          * Sets the instance provider for this builder.
          *
-         * <p>By default, a {@link SimpleInstanceProvider} will be used (using the short-lived {@link ExecutionContext}
-         * passed to {@link #Builder(Session, Path, CommandProvider, ExecutionContext, ScheduledExecutorService)}).
+         * <p>By default, a {@link SimpleInstanceProvider} will be used (using the short-lived {@link Executor}
+         * passed to {@link #Builder(Session, Path, CommandProvider, Executor, ScheduledExecutorService)}).
          *
          * @param instanceProvider instance provider
          * @return this builder
@@ -243,10 +238,10 @@ public final class DrmaaSimpleModuleExecutor implements SimpleModuleExecutor {
                 ? EmptyNativeSpecificationProvider.INSTANCE
                 : nativeSpecificationProvider;
             InstanceProvider actualInstanceProvider = instanceProvider == null
-                ? new SimpleInstanceProvider.Builder(shortLivedExecutionContext).build()
+                ? new SimpleInstanceProvider.Builder(shortTasksExecutor).build()
                 : instanceProvider;
             return new DrmaaSimpleModuleExecutor(session, jobIOBasePath, commandProvider, actualNativeProvider,
-                actualInstanceProvider, waitTimeoutSeconds, errorWaitMilliseconds, shortLivedExecutionContext,
+                actualInstanceProvider, waitTimeoutSeconds, errorWaitMilliseconds, shortTasksExecutor,
                 longLivedExecutorService);
         }
     }
@@ -268,11 +263,11 @@ public final class DrmaaSimpleModuleExecutor implements SimpleModuleExecutor {
 
     static final class FinishedJob {
         private final SubmittedJob submittedJob;
-        private final Option<Integer> exitStatus;
-        private final Option<String> terminatingSignal;
+        private final Optional<Integer> exitStatus;
+        private final Optional<String> terminatingSignal;
         private final boolean aborted;
 
-        private FinishedJob(SubmittedJob submittedJob, Option<Integer> exitStatus, Option<String> terminatingSignal,
+        private FinishedJob(SubmittedJob submittedJob, Optional<Integer> exitStatus, Optional<String> terminatingSignal,
                 boolean aborted) {
             this.submittedJob = submittedJob;
             this.exitStatus = exitStatus;
@@ -280,8 +275,8 @@ public final class DrmaaSimpleModuleExecutor implements SimpleModuleExecutor {
             this.aborted = aborted;
         }
 
-        private static <T> String optionToString(Option<T> option) {
-            return option.isDefined()
+        private static <T> String optionToString(Optional<T> option) {
+            return option.isPresent()
                 ? option.get().toString()
                 : "-";
         }
@@ -298,11 +293,11 @@ public final class DrmaaSimpleModuleExecutor implements SimpleModuleExecutor {
 
     static final class AwaitedJob {
         private final SubmittedJob submittedJob;
-        private final Promise<FinishedJob> promise;
+        private final CompletableFuture<FinishedJob> completableFuture;
 
-        AwaitedJob(SubmittedJob submittedJob, Promise<FinishedJob> promise) {
+        AwaitedJob(SubmittedJob submittedJob, CompletableFuture<FinishedJob> completableFuture) {
             this.submittedJob = submittedJob;
-            this.promise = promise;
+            this.completableFuture = completableFuture;
         }
     }
 
@@ -337,19 +332,16 @@ public final class DrmaaSimpleModuleExecutor implements SimpleModuleExecutor {
         }
     }
 
-    private final class WaitForJobMapper extends Mapper<SubmittedJob, Future<FinishedJob>> {
-        @Override
-        public Future<FinishedJob> apply(SubmittedJob submittedJob) {
-            Promise<FinishedJob> promise = Futures.promise();
-            synchronized (awaitedJobMap) {
-                awaitedJobMap.put(submittedJob.drmaaId, new AwaitedJob(submittedJob, promise));
-                if (!waitTaskIsRunning) {
-                    longLivedExecutorService.execute(waitForNextJobTask);
-                    waitTaskIsRunning = true;
-                }
+    private CompletionStage<FinishedJob> waitForJob(SubmittedJob submittedJob) {
+        CompletableFuture<FinishedJob> future = new CompletableFuture<>();
+        synchronized (awaitedJobMap) {
+            awaitedJobMap.put(submittedJob.drmaaId, new AwaitedJob(submittedJob, future));
+            if (!waitTaskIsRunning) {
+                longLivedExecutorService.execute(waitForNextJobTask);
+                waitTaskIsRunning = true;
             }
-            return promise.future();
         }
+        return future;
     }
 
     private static SimpleModuleExecutorResult.Builder resultBuilder(Timing timing) {
@@ -373,115 +365,78 @@ public final class DrmaaSimpleModuleExecutor implements SimpleModuleExecutor {
             resultBuilder.addProperty(JOB_ID, localSubmittedJob.drmaaId);
         }
         @Nullable FinishedJob localFinishedJob = timing.finishedJob;
-        if (localFinishedJob != null && localFinishedJob.exitStatus.isDefined()) {
+        if (localFinishedJob != null && localFinishedJob.exitStatus.isPresent()) {
             resultBuilder.addProperty(EXIT_VALUE, (long) localFinishedJob.exitStatus.get());
         }
         return resultBuilder;
     }
 
-    private final class FinishedJobMapper extends Mapper<FinishedJob, SimpleModuleExecutorResult> {
-        private final Timing timing;
-
-        private FinishedJobMapper(Timing timing) {
-            this.timing = timing;
-        }
-
-        private void logOutput(Path outputFile, String outputDescription, String drmaaId) {
-            if (Files.exists(outputFile)) {
-                boolean empty = true;
-                try (BufferedReader reader = Files.newBufferedReader(outputFile, StandardCharsets.UTF_8)) {
-                    @Nullable String line = reader.readLine();
-                    while (line != null) {
-                        if (empty && !line.isEmpty()) {
-                            empty = false;
-                            log.info("Content of {} of DRMAA job '{}' follows.", outputDescription, drmaaId);
-                            log.info("--8<--");
-                        }
-                        log.info(line);
-                        line = reader.readLine();
+    private void logOutput(Path outputFile, String outputDescription, String drmaaId) {
+        if (Files.exists(outputFile)) {
+            boolean empty = true;
+            try (BufferedReader reader = Files.newBufferedReader(outputFile, StandardCharsets.UTF_8)) {
+                @Nullable String line = reader.readLine();
+                while (line != null) {
+                    if (empty && !line.isEmpty()) {
+                        empty = false;
+                        log.info("Content of {} of DRMAA job '{}' follows.", outputDescription, drmaaId);
+                        log.info("--8<--");
                     }
-                    if (!empty) {
-                        log.info("-->8--");
-                        log.info("End of content of {} of DRMAA job '{}'.", outputDescription, drmaaId);
-                    }
-                } catch (IOException exception) {
-                    log.warn(String.format(
-                        "Exception while logging the content of %s of DRMAA job '%s' (path: %s).",
-                        outputDescription, drmaaId, outputFile
-                    ), exception);
+                    log.info(line);
+                    line = reader.readLine();
                 }
-            }
-        }
-
-        @Override
-        public SimpleModuleExecutorResult checkedApply(FinishedJob finishedJob)
-                throws IOException, ClassNotFoundException, ExecutionException {
-            timing.finishedJob = finishedJob;
-            log.debug("{}", finishedJob);
-            @Nullable Path ioPath = timing.ioPath;
-            assert ioPath != null : "set to non-null value before job was started";
-            logOutput(stderrPath(ioPath), "stderr", finishedJob.submittedJob.drmaaId);
-            SimpleModuleExecutorResult.Builder resultBuilder = resultBuilder(timing);
-            if (finishedJob.exitStatus.isDefined() && finishedJob.exitStatus.get() == 0) {
-                try (Splitter<SimpleModuleExecutorResult> splitter = new Splitter<>(
-                        SimpleModuleExecutorResult.class, Files.newBufferedReader(stdoutPath(ioPath)))) {
-                    splitter.consumeAll();
-                    resultBuilder.addExecutionResult(splitter.getResult());
-                }
-            } else {
-                logOutput(stdoutPath(ioPath), "stdout", finishedJob.submittedJob.drmaaId);
-                resultBuilder.setException(new ExecutionException(String.format(
-                    "DRMAA job '%s' failed (exit status %s, terminating signal %s)",
-                    finishedJob.submittedJob.drmaaId, finishedJob.exitStatus, finishedJob.terminatingSignal
-                )));
-            }
-            return resultBuilder
-                .addProperty(COMPLETION_TIME_MILLIS, System.currentTimeMillis())
-                .build();
-        }
-    }
-
-    private static final class RecoverWithTiming extends Recover<SimpleModuleExecutorResult> {
-        private final Timing timing;
-
-        private RecoverWithTiming(Timing timing) {
-            this.timing = timing;
-        }
-
-        @Override
-        public SimpleModuleExecutorResult recover(Throwable throwable) {
-            return resultBuilder(timing)
-                .setException(new ExecutionException(
-                    "Exception while trying to execute simple module using DRMAA.", throwable
-                ))
-                .addProperty(COMPLETION_TIME_MILLIS, System.currentTimeMillis())
-                .build();
-        }
-    }
-
-    private final class Cleaner extends OnComplete<SimpleModuleExecutorResult> {
-        private final Timing timing;
-
-        private Cleaner(Timing timing) {
-            this.timing = timing;
-        }
-
-        @Override
-        public void onComplete(Throwable throwable, SimpleModuleExecutorResult result) {
-            try {
-                @Nullable Path ioPath = timing.ioPath;
-                if (ioPath != null) {
-                    Files.walkFileTree(ioPath, RecursiveDeleteVisitor.getInstance());
+                if (!empty) {
+                    log.info("-->8--");
+                    log.info("End of content of {} of DRMAA job '{}'.", outputDescription, drmaaId);
                 }
             } catch (IOException exception) {
-                log.warn(String.format("Ignoring I/O exception while trying to clean '%s'.", timing.ioPath), exception);
+                log.warn(String.format(
+                    "Exception while logging the content of %s of DRMAA job '%s' (path: %s).",
+                    outputDescription, drmaaId, outputFile
+                ), exception);
             }
         }
     }
 
-    private SubmittedJob newSubmittedJob(RuntimeStateProvider runtimeStateProvider,
-            RuntimeContext runtimeContext, Timing timing)
-            throws IOException, DrmaaException, InstanceProvisionException, LinkerException {
+    private SimpleModuleExecutorResult processFinishedJob(Timing timing, FinishedJob finishedJob)
+            throws IOException, ClassNotFoundException, ExecutionException {
+        timing.finishedJob = finishedJob;
+        log.debug("{}", finishedJob);
+        @Nullable Path ioPath = timing.ioPath;
+        assert ioPath != null : "set to non-null value before job was started";
+        logOutput(stderrPath(ioPath), "stderr", finishedJob.submittedJob.drmaaId);
+        SimpleModuleExecutorResult.Builder resultBuilder = resultBuilder(timing);
+        if (finishedJob.exitStatus.isPresent() && finishedJob.exitStatus.get() == 0) {
+            try (Splitter<SimpleModuleExecutorResult> splitter = new Splitter<>(
+                    SimpleModuleExecutorResult.class, Files.newBufferedReader(stdoutPath(ioPath)))) {
+                splitter.consumeAll();
+                resultBuilder.addExecutionResult(splitter.getResult());
+            }
+        } else {
+            logOutput(stdoutPath(ioPath), "stdout", finishedJob.submittedJob.drmaaId);
+            resultBuilder.setException(new ExecutionException(String.format(
+                "DRMAA job '%s' failed (exit status %s, terminating signal %s)",
+                finishedJob.submittedJob.drmaaId, finishedJob.exitStatus, finishedJob.terminatingSignal
+            )));
+        }
+        return resultBuilder
+            .addProperty(COMPLETION_TIME_MILLIS, System.currentTimeMillis())
+            .build();
+    }
+
+    private void cleanIODirectory(Timing timing) {
+        try {
+            @Nullable Path ioPath = timing.ioPath;
+            if (ioPath != null) {
+                Files.walkFileTree(ioPath, RecursiveDeleteVisitor.getInstance());
+            }
+        } catch (IOException exception) {
+            log.warn(String.format("Ignoring I/O exception while trying to clean '%s'.", timing.ioPath), exception);
+        }
+    }
+
+    private SubmittedJob submitJob(RuntimeStateProvider runtimeStateProvider, RuntimeContext runtimeContext,
+            Timing timing) throws IOException, DrmaaException, InstanceProvisionException, LinkerException {
         RuntimeAnnotatedExecutionTrace executionTrace = runtimeStateProvider.provideExecutionTrace(runtimeContext);
         RuntimeProxyModule module = (RuntimeProxyModule) executionTrace.getModule();
         String declarationName = module.getDeclaration().getQualifiedName().toString();
@@ -516,22 +471,32 @@ public final class DrmaaSimpleModuleExecutor implements SimpleModuleExecutor {
     }
 
     @Override
-    public Future<SimpleModuleExecutorResult> submit(RuntimeStateProvider runtimeStateProvider,
-            @Nullable Future<String> cancellationFuture) {
+    public CompletableFuture<SimpleModuleExecutorResult> submit(RuntimeStateProvider runtimeStateProvider) {
         Timing timing = new Timing(System.currentTimeMillis());
-        return runtimeStateProvider
-            .flatMapRuntimeContext(instanceProvider, runtimeContext -> {
-                Future<SimpleModuleExecutorResult> future = Futures
-                    .future(
-                        () -> newSubmittedJob(runtimeStateProvider, runtimeContext, timing),
-                        shortLivedExecutionContext
-                    )
-                    .flatMap(waitForJobMapper, shortLivedExecutionContext)
-                    .map(new FinishedJobMapper(timing), shortLivedExecutionContext);
-                future.onComplete(new Cleaner(timing), shortLivedExecutionContext);
+        return Futures.thenComposeWithResource(
+            runtimeStateProvider.provideRuntimeContext(instanceProvider),
+            runtimeContext -> {
+                CompletionStage<SubmittedJob> submissionStage = Futures.supplyAsync(
+                    () -> submitJob(runtimeStateProvider, runtimeContext, timing),
+                    shortTasksExecutor
+                );
+                CompletionStage<FinishedJob> jobRunningStage = submissionStage.thenCompose(this::waitForJob);
+                CompletableFuture<SimpleModuleExecutorResult> future = Futures.thenApplyAsync(
+                    jobRunningStage,
+                    finishedJob -> processFinishedJob(timing, finishedJob),
+                    shortTasksExecutor
+                );
+                future.whenComplete((ignoredResult, ignoredFailure) -> cleanIODirectory(timing));
                 return future;
-            }, shortLivedExecutionContext)
-            .recover(new RecoverWithTiming(timing), shortLivedExecutionContext);
+            })
+            .exceptionally(throwable -> resultBuilder(timing)
+                .setException(new ExecutionException(
+                    "Exception while trying to execute simple module using DRMAA.",
+                    Futures.unwrapCompletionException(throwable)
+                ))
+                .addProperty(COMPLETION_TIME_MILLIS, System.currentTimeMillis())
+                .build()
+            );
     }
 
     enum TaskState {
@@ -555,14 +520,15 @@ public final class DrmaaSimpleModuleExecutor implements SimpleModuleExecutor {
                 if (awaitedJob == null) {
                     log.warn(String.format("Ignoring event that unknown DRMAA job '%s' finished.", jobId));
                 } else {
-                    Option<Integer> exitStatus = jobInfo.hasExited()
-                        ? Option.some(jobInfo.getExitStatus())
-                        : Option.<Integer>none();
-                    Option<String> terminatingSignal = jobInfo.hasSignaled()
-                        ? Option.some(jobInfo.getTerminatingSignal())
-                        : Option.<String>none();
-                    awaitedJob.promise.success(new FinishedJob(
-                        awaitedJob.submittedJob, exitStatus, terminatingSignal, jobInfo.wasAborted()));
+                    Optional<Integer> exitStatus = jobInfo.hasExited()
+                        ? Optional.of(jobInfo.getExitStatus())
+                        : Optional.empty();
+                    Optional<String> terminatingSignal = jobInfo.hasSignaled()
+                        ? Optional.of(jobInfo.getTerminatingSignal())
+                        : Optional.empty();
+                    awaitedJob.completableFuture.complete(new FinishedJob(
+                        awaitedJob.submittedJob, exitStatus, terminatingSignal, jobInfo.wasAborted()
+                    ));
                 }
                 taskState = TaskState.FINISHED;
             } catch (ExitTimeoutException ignored) {

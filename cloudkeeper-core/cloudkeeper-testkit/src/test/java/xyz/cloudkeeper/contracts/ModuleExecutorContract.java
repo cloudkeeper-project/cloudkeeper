@@ -1,12 +1,7 @@
 package xyz.cloudkeeper.contracts;
 
-import akka.dispatch.Futures;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-import scala.concurrent.Await;
-import scala.concurrent.Awaitable;
-import scala.concurrent.Promise;
-import scala.concurrent.duration.FiniteDuration;
 import xyz.cloudkeeper.examples.modules.Fibonacci;
 import xyz.cloudkeeper.examples.modules.ThrowingModule;
 import xyz.cloudkeeper.model.api.RuntimeStateProvider;
@@ -18,6 +13,9 @@ import xyz.cloudkeeper.model.immutable.element.Index;
 import xyz.cloudkeeper.model.immutable.element.SimpleName;
 import xyz.cloudkeeper.model.immutable.execution.ExecutionTrace;
 
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+
 /**
  * Contract test for simple-module execution functionality.
  *
@@ -27,17 +25,17 @@ import xyz.cloudkeeper.model.immutable.execution.ExecutionTrace;
 public final class ModuleExecutorContract {
     private final SimpleModuleExecutor simpleModuleExecutor;
     private final StagingAreaContractProvider stagingAreaContractProvider;
-    private final FiniteDuration awaitDuration;
+    private final long awaitDurationMillis;
 
     public ModuleExecutorContract(SimpleModuleExecutor simpleModuleExecutor,
-            StagingAreaContractProvider stagingAreaContractProvider, FiniteDuration awaitDuration) {
+            StagingAreaContractProvider stagingAreaContractProvider, long awaitDurationMillis) {
         this.simpleModuleExecutor = simpleModuleExecutor;
         this.stagingAreaContractProvider = stagingAreaContractProvider;
-        this.awaitDuration = awaitDuration;
+        this.awaitDurationMillis = awaitDurationMillis;
     }
 
-    private <T> T await(Awaitable<T> awaitable) throws Exception {
-        return Await.result(awaitable, awaitDuration);
+    private <T> T await(CompletableFuture<T> future) throws Exception {
+        return future.get(awaitDurationMillis, TimeUnit.MILLISECONDS);
     }
 
     /**
@@ -56,16 +54,14 @@ public final class ModuleExecutorContract {
         await(stagingArea.putObject(ExecutionTrace.empty().resolveInPort(SimpleName.identifier("num1")), 4));
         await(stagingArea.putObject(ExecutionTrace.empty().resolveInPort(SimpleName.identifier("num2")), 6));
 
-        Promise<String> cancellationPromise = Futures.promise();
         ExecutionTrace sumTrace = ExecutionTrace.empty().resolveOutPort(SimpleName.identifier("sum"));
         Assert.assertFalse(await(stagingArea.exists(sumTrace)));
 
         RuntimeStateProvider runtimeStateProvider = RuntimeStateProvider.of(helper.getRuntimeContext(), stagingArea);
-        SimpleModuleExecutorResult result
-            = await(simpleModuleExecutor.submit(runtimeStateProvider, cancellationPromise.future()));
-        Assert.assertTrue(result.getExecutionException().isEmpty());
+        SimpleModuleExecutorResult result = await(simpleModuleExecutor.submit(runtimeStateProvider));
+        Assert.assertNull(result.getExecutionException());
         Assert.assertEquals(await(stagingArea.getObject(sumTrace)), 10);
-        Assert.assertTrue(result.getExecutionException().isEmpty());
+        Assert.assertNull(result.getExecutionException());
     }
 
     @Test
@@ -75,15 +71,14 @@ public final class ModuleExecutorContract {
         StagingArea stagingArea = helper.createStagingArea("submitTestThrowingModule");
         await(stagingArea.putObject(ExecutionTrace.empty().resolveInPort(SimpleName.identifier("string")), "foo"));
 
-        Promise<String> cancellationPromise = Futures.promise();
         RuntimeStateProvider runtimeStateProvider = RuntimeStateProvider.of(helper.getRuntimeContext(), stagingArea);
         SimpleModuleExecutorResult result
-            = await(simpleModuleExecutor.submit(runtimeStateProvider, cancellationPromise.future()));
+            = await(simpleModuleExecutor.submit(runtimeStateProvider));
         Assert.assertFalse(
             await(stagingArea.exists(ExecutionTrace.empty().resolveOutPort(SimpleName.identifier("size"))))
         );
         try {
-            throw result.getExecutionException().get();
+            throw result.getExecutionException();
         } catch (UserException exception) {
             Assert.assertTrue(exception.getCause() instanceof ThrowingModule.ExpectedException);
         }

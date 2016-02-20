@@ -6,6 +6,7 @@ import akka.actor.Status;
 import akka.actor.UntypedActor;
 import akka.japi.Creator;
 import xyz.cloudkeeper.interpreter.InterpreterInterface.SubmoduleOutPortHasSignal;
+import xyz.cloudkeeper.model.api.ExecutionException;
 import xyz.cloudkeeper.model.api.RuntimeStateProvider;
 import xyz.cloudkeeper.model.api.executor.SimpleModuleExecutorResult;
 import xyz.cloudkeeper.model.api.staging.StagingArea;
@@ -142,11 +143,12 @@ final class SimpleModuleInterpreterActor extends AbstractModuleInterpreterActor 
         state = State.DONE;
         result = executorResult;
 
-        if (executorResult.getExecutionException().isDefined()) {
+        @Nullable ExecutionException executionException = executorResult.getExecutionException();
+        if (executionException != null) {
             failure(new InterpreterException(
                 getAbsoluteTrace(),
                 String.format("Exception while executing %s.", module),
-                executorResult.getExecutionException().get()
+                executionException
             ));
         }
 

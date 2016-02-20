@@ -40,41 +40,4 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
-
-    <build>
-        <plugins>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-shade-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>shade</goal>
-                        </goals>
-                        <configuration>
-                            <createSourcesJar>true</createSourcesJar>
-                            <createDependencyReducedPom>true</createDependencyReducedPom>
-                            <relocations>
-                                <relocation>
-                                    <pattern>net.florianschoppmann.java</pattern>
-                                    <shadedPattern>${relocation.prefix}.java</shadedPattern>
-                                </relocation>
-                            </relocations>
-                            <!-- Ensure that the shaded jar will be the main artifact of the project. -->
-                            <shadedArtifactAttached>false</shadedArtifactAttached>
-                            <dependencyReducedPomLocation>
-                                ${project.build.directory}/dependency-reduced-pom.xml
-                            </dependencyReducedPomLocation>
-                            <artifactSet>
-                                <includes>
-                                    <include>net.florianschoppmann.java:java-types</include>
-                                </includes>
-                            </artifactSet>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-        </plugins>
-    </build>
 </project>

@@ -1,10 +1,10 @@
 package xyz.cloudkeeper.model.api;
 
-import scala.concurrent.Future;
 import xyz.cloudkeeper.model.runtime.element.RuntimeRepository;
 
 import java.net.URI;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Factory of runtime contexts.
@@ -29,8 +29,8 @@ import java.util.List;
  */
 public interface RuntimeContextFactory {
     /**
-     * Returns a future that will be completed with the repository resulting from loading, linking, and verifying the
-     * bundles identified by the given identifiers.
+     * Returns a new future that will be completed with the (new) runtime context resulting from loading, linking, and
+     * verifying the bundles identified by the given identifiers.
      *
      * <p>Callers are responsible for closing the {@link RuntimeRepository} instance that the returned future will be
      * completed with.
@@ -43,7 +43,6 @@ public interface RuntimeContextFactory {
      * @param bundleIdentifiers list of bundle identifiers
      * @return future that will be completed with the repository on success or a {@link RuntimeStateProvisionException}
      *     on failure
-     * @throws NullPointerException if the argument is {@code null}
      */
-    Future<RuntimeContext> newRuntimeContext(List<URI> bundleIdentifiers);
+    CompletableFuture<RuntimeContext> newRuntimeContext(List<URI> bundleIdentifiers);
 }

@@ -7,33 +7,34 @@ import xyz.cloudkeeper.model.api.staging.InstanceProvisionException;
 
 import javax.annotation.Nullable;
 import java.util.Objects;
+import java.util.concurrent.Executor;
 
 /**
  * Simple instance provider for {@link RuntimeContextFactory} and {@link ExecutionContext} instances.
  */
 public final class SimpleInstanceProvider implements InstanceProvider {
-    private final ExecutionContext executionContext;
+    private final Executor executor;
     private final RuntimeContextFactory runtimeContextFactory;
 
     private SimpleInstanceProvider(Builder builder) {
-        executionContext = builder.executionContext;
+        executor = builder.executor;
         runtimeContextFactory = builder.runtimeContextFactory == null
-            ? new DSLRuntimeContextFactory.Builder(executionContext).build()
+            ? new DSLRuntimeContextFactory.Builder(executor).build()
             : builder.runtimeContextFactory;
     }
 
     public static final class Builder {
         @Nullable private RuntimeContextFactory runtimeContextFactory = null;
-        private final ExecutionContext executionContext;
+        private final Executor executor;
 
         /**
          * Constructor.
          *
-         * @param executionContext Execution context that will be returned by the instance provider. If no bundle loader
-         *     will be set, the execution context will also be used for constructing a {@link DSLRuntimeContextFactory}.
+         * @param executor Executor that will be returned by the instance provider. If no bundle loader will be set, the
+         *     execution context will also be used for constructing a {@link DSLRuntimeContextFactory}.
          */
-        public Builder(ExecutionContext executionContext) {
-            this.executionContext = Objects.requireNonNull(executionContext);
+        public Builder(Executor executor) {
+            this.executor = Objects.requireNonNull(executor);
         }
 
         /**
@@ -59,8 +60,8 @@ public final class SimpleInstanceProvider implements InstanceProvider {
     public <T> T getInstance(Class<T> requestedClass) throws InstanceProvisionException {
         if (RuntimeContextFactory.class.equals(requestedClass)) {
             return (T) runtimeContextFactory;
-        } else if (ExecutionContext.class.equals(requestedClass)) {
-            return (T) executionContext;
+        } else if (Executor.class.equals(requestedClass)) {
+            return (T) executor;
         } else {
             throw new InstanceProvisionException(String.format(
                 "Cannot provide instance of %s.", requestedClass

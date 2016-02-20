@@ -1,15 +1,17 @@
 package xyz.cloudkeeper.model.api.executor;
 
-import scala.concurrent.Future;
 import xyz.cloudkeeper.model.api.staging.StagingArea;
+
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Provider (factory) of {@link ExtendedModuleConnector} instances corresponding to a staging area and its represented
  * simple module.
  */
+@FunctionalInterface
 public interface ModuleConnectorProvider {
     /**
-     * Returns a future that will be completed with a {@link ExtendedModuleConnector} instance.
+     * Returns a new future that will be completed with a new {@link ExtendedModuleConnector} instance.
      *
      * @param stagingArea staging area (the absolute execution trace returned by
      *     {@link StagingArea#getAnnotatedExecutionTrace()} must be of type
@@ -20,5 +22,5 @@ public interface ModuleConnectorProvider {
      * @throws NullPointerException if the argument is null
      * @throws IllegalArgumentException if the argument does not satisfy the constraints described above
      */
-    Future<ExtendedModuleConnector> provideModuleConnector(StagingArea stagingArea);
+    CompletableFuture<ExtendedModuleConnector> provideModuleConnector(StagingArea stagingArea);
 }

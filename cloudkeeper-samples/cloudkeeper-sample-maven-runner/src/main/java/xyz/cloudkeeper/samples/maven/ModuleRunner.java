@@ -16,7 +16,6 @@ import org.eclipse.aether.spi.connector.transport.TransporterFactory;
 import org.eclipse.aether.transport.file.FileTransporterFactory;
 import org.eclipse.aether.transport.http.HttpTransporterFactory;
 import scala.concurrent.Await;
-import scala.concurrent.ExecutionContext;
 import scala.concurrent.duration.Duration;
 import xyz.cloudkeeper.dsl.ModuleFactory;
 import xyz.cloudkeeper.maven.Bundles;
@@ -42,6 +41,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collections;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -109,14 +109,14 @@ public final class ModuleRunner {
         repositorySystemSession.setOffline(aetherConfiguration.offline);
 
         ActorSystem actorSystem = ActorSystem.create("CloudKeeper-Runner");
-        ExecutionContext executionContext = actorSystem.dispatcher();
+        Executor executor = actorSystem.dispatcher();
 
         MavenRuntimeContextFactory runtimeContextFactory = new MavenRuntimeContextFactory.Builder(
-                executionContext, repositorySystem, repositorySystemSession)
+                executor, repositorySystem, repositorySystemSession)
             .setRemoteRepositories(aetherConfiguration.remoteRepositories)
             .setExecutableProviderProvider(classLoader -> new DSLExecutableProvider(new ModuleFactory(classLoader)))
             .build();
-        InstanceProvider instanceProvider = new SimpleInstanceProvider.Builder(executionContext)
+        InstanceProvider instanceProvider = new SimpleInstanceProvider.Builder(executor)
             .setRuntimeContextFactory(runtimeContextFactory)
             .build();
         SingleVMCloudKeeper cloudKeeper = new SingleVMCloudKeeper.Builder()

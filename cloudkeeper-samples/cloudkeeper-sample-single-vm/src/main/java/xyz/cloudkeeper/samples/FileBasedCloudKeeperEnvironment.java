@@ -1,7 +1,5 @@
 package xyz.cloudkeeper.samples;
 
-import akka.dispatch.ExecutionContexts;
-import scala.concurrent.ExecutionContext;
 import xyz.cloudkeeper.filesystem.FileStagingArea;
 import xyz.cloudkeeper.model.api.CloudKeeperEnvironment;
 import xyz.cloudkeeper.model.api.WorkflowExecutionBuilder;
@@ -32,8 +30,6 @@ public final class FileBasedCloudKeeperEnvironment implements CloudKeeperEnviron
     private final CloudKeeperEnvironment delegate;
 
     public FileBasedCloudKeeperEnvironment() throws IOException {
-        final ExecutionContext executionContext = ExecutionContexts.fromExecutorService(executorService);
-
         temporaryDirectory = Files.createTempDirectory(getClass().getSimpleName());
         cloudKeeper = new SingleVMCloudKeeper.Builder()
             .setWorkspaceBasePath(temporaryDirectory)
@@ -44,7 +40,7 @@ public final class FileBasedCloudKeeperEnvironment implements CloudKeeperEnviron
                 Path basePath;
                 try {
                     basePath = Files.createTempDirectory(temporaryDirectory, "StagingArea");
-                    return new FileStagingArea.Builder(runtimeContext, executionTrace, basePath, executionContext)
+                    return new FileStagingArea.Builder(runtimeContext, executionTrace, basePath, executorService)
                             .build();
                 } catch (IOException exception) {
                     throw new InstanceProvisionException(

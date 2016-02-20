@@ -1,30 +1,19 @@
 package xyz.cloudkeeper.interpreter;
 
 import akka.actor.ActorRef;
-import akka.dispatch.Futures;
+import akka.dispatch.ExecutionContexts;
 import akka.dispatch.Mapper;
-import akka.dispatch.OnComplete;
-import akka.dispatch.OnFailure;
-import akka.japi.Option;
 import akka.pattern.Patterns;
 import akka.util.Timeout;
 import scala.concurrent.ExecutionContext;
-import scala.concurrent.Future;
-import scala.concurrent.Promise;
-import scala.util.Failure;
-import scala.util.Success;
 import xyz.cloudkeeper.model.Immutable;
-import xyz.cloudkeeper.model.LinkerException;
-import xyz.cloudkeeper.model.api.CancellationException;
 import xyz.cloudkeeper.model.api.RuntimeContext;
 import xyz.cloudkeeper.model.api.RuntimeContextFactory;
 import xyz.cloudkeeper.model.api.RuntimeStateProvider;
 import xyz.cloudkeeper.model.api.WorkflowExecution;
 import xyz.cloudkeeper.model.api.WorkflowExecutionBuilder;
 import xyz.cloudkeeper.model.api.WorkflowExecutionException;
-import xyz.cloudkeeper.model.api.staging.InstanceProvisionException;
 import xyz.cloudkeeper.model.api.staging.StagingArea;
-import xyz.cloudkeeper.model.api.util.ScalaFutures;
 import xyz.cloudkeeper.model.bare.element.module.BareModule;
 import xyz.cloudkeeper.model.bare.execution.BareOverride;
 import xyz.cloudkeeper.model.beans.element.module.MutableModule;
@@ -36,7 +25,7 @@ import xyz.cloudkeeper.model.runtime.element.module.RuntimeModule;
 import xyz.cloudkeeper.model.runtime.element.module.RuntimeOutPort;
 import xyz.cloudkeeper.model.runtime.element.module.RuntimePort;
 import xyz.cloudkeeper.model.runtime.execution.RuntimeAnnotatedExecutionTrace;
-import xyz.cloudkeeper.model.runtime.execution.RuntimeExecutionTrace;
+import net.florianschoppmann.java.futures.Futures;
 import xyz.cloudkeeper.model.util.ImmutableList;
 
 import javax.annotation.Nullable;
@@ -48,7 +37,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.Executor;
 
 /**
  * Implementation of workflow-execution builder.
@@ -117,28 +110,31 @@ final class WorkflowExecutionBuilderImpl implements WorkflowExecutionBuilder {
     private static final class Context {
         private final long startTimeMillis = System.currentTimeMillis();
         private final CloudKeeperEnvironmentImpl cloudKeeperEnvironment;
+        private final Executor executor;
         private final ExecutionContext executionContext;
         private final BareModule module;
         private final List<URI> bundleIdentifiers;
         private final List<BareOverride> overrides;
         private final Map<SimpleName, Object> inputValues;
 
-        private final Promise<StagingArea> stagingAreaPromise = Futures.promise();
-        private final Promise<ImmutableList<Future<Object>>> outPortFuturesPromise = Futures.promise();
-        private final Promise<Long> executionIdPromise = Futures.promise();
-        private final Promise<Long> finishTimeMillisPromise = Futures.promise();
-        private final Promise<Option<WorkflowExecutionException>> executionExceptionPromise = Futures.promise();
-        private final Promise<CancellationException> cancellationPromise = Futures.promise();
+        private final CompletableFuture<StagingArea> stagingAreaPromise = new CompletableFuture<>();
+        private final CompletableFuture<ImmutableList<CompletableFuture<Object>>> outPortFuturesPromise
+            = new CompletableFuture<>();
+        private final CompletableFuture<Long> executionIdPromise = new CompletableFuture<>();
+        private final CompletableFuture<Long> finishTimeMillisPromise = new CompletableFuture<>();
+        private final CompletableFuture<Optional<WorkflowExecutionException>> executionExceptionPromise
+            = new CompletableFuture<>();
+        private final CompletableFuture<Void> cancellationPromise = new CompletableFuture<>();
 
         private Context(CloudKeeperEnvironmentImpl environment, BareModule module,
-            List<URI> bundleIdentifiers, List<BareOverride> overrides,
-            Map<SimpleName, Object> inputValues) {
-
+                List<URI> bundleIdentifiers, List<BareOverride> overrides,
+                Map<SimpleName, Object> inputValues) {
             assert environment != null && module != null && bundleIdentifiers != null && overrides != null
                 && inputValues != null;
 
             cloudKeeperEnvironment = environment;
-            executionContext = environment.getExecutionContext();
+            executor = environment.getRunnableExecutor();
+            executionContext = ExecutionContexts.fromExecutor(executor);
             this.module = module;
             this.bundleIdentifiers = bundleIdentifiers;
             this.overrides = overrides;
@@ -149,8 +145,8 @@ final class WorkflowExecutionBuilderImpl implements WorkflowExecutionBuilder {
          * Writes the inputs to the staging area and send a create-execution message to the master interpreter. This
          * message will only return a new execution ID, but the execution will not yet be started.
          */
-        private Future<Long> writeInputsAndCreateExecution(RuntimeContext runtimeContext, StagingArea stagingArea)
-                throws WorkflowExecutionException {
+        private CompletableFuture<Long> writeInputsAndCreateExecution(RuntimeContext runtimeContext,
+                StagingArea stagingArea) throws WorkflowExecutionException {
             RuntimeModule runtimeModule = stagingArea.getAnnotatedExecutionTrace().getModule();
 
             // All ports for which inputs were explicitly set are implicitly marked as updated!
@@ -169,7 +165,7 @@ final class WorkflowExecutionBuilderImpl implements WorkflowExecutionBuilder {
             }
 
             // Now go ahead and write the inputs
-            List<Future<RuntimeExecutionTrace>> inputFutures = new ArrayList<>(inputValues.size());
+            List<CompletableFuture<Void>> inputFutures = new ArrayList<>(inputValues.size());
             for (Map.Entry<SimpleName, Object> entry: inputValues.entrySet()) {
                 @Nullable Object value = entry.getValue();
                 if (value != null) {
@@ -193,72 +189,64 @@ final class WorkflowExecutionBuilderImpl implements WorkflowExecutionBuilder {
 
             // Once all inputs have been written to the staging area, we will send the create-execution message to the
             // master interpreter
-            return ScalaFutures.createListFuture(inputFutures, executionContext)
-                .flatMap(new Mapper<ImmutableList<RuntimeExecutionTrace>, Future<Long>>() {
-                    @Override
-                    public Future<Long> apply(ImmutableList<RuntimeExecutionTrace> ignored) {
-                        ActorRef masterInterpreter = cloudKeeperEnvironment.getMasterInterpreter();
-                        return Patterns
-                            .ask(masterInterpreter, message, cloudKeeperEnvironment.getRemoteAskTimeout())
-                            .map(TO_LONG_MAPPER, executionContext);
-                    }
-                }, executionContext);
+            return CompletableFuture.allOf(inputFutures.toArray(new CompletableFuture<?>[inputFutures.size()]))
+                .thenCompose(ignored -> {
+                    ActorRef masterInterpreter = cloudKeeperEnvironment.getMasterInterpreter();
+                    Timeout remoteAskTimeout = cloudKeeperEnvironment.getRemoteAskTimeout();
+                    return ScalaFutures.completableFutureOf(
+                        Patterns
+                            .ask(masterInterpreter, message, remoteAskTimeout)
+                            .map(TO_LONG_MAPPER, executionContext),
+                        executionContext
+                    );
+                });
         }
 
         /**
          *
          */
-        private Future<Long> createOutputFuturesAndStartExecution(RuntimeContext runtimeContext,
+        private CompletableFuture<Long> createOutputFuturesAndStartExecution(RuntimeContext runtimeContext,
                 StagingArea stagingArea) throws WorkflowExecutionException {
             final RuntimeModule runtimeModule = stagingArea.getAnnotatedExecutionTrace().getModule();
             int numOutPorts = runtimeModule.getOutPorts().size();
-            final List<Promise<Object>> outPortPromises = new ArrayList<>(numOutPorts);
-            final List<Future<Object>> outPortFutures = new ArrayList<>(numOutPorts);
+            List<CompletableFuture<Object>> outPortPromises = new ArrayList<>(numOutPorts);
             for (int i = 0; i < numOutPorts; ++i) {
-                Promise<Object> promise = Futures.promise();
-                outPortPromises.add(promise);
-                outPortFutures.add(promise.future());
+                outPortPromises.add(new CompletableFuture<>());
             }
 
             return writeInputsAndCreateExecution(runtimeContext, stagingArea)
-                .flatMap(new Mapper<Long, Future<Object>>() {
-                    @Override
-                    public Future<Object> apply(Long executionId) {
-                        ActorRef administrator = cloudKeeperEnvironment.getAdministrator();
-                        boolean retrieveResults = cloudKeeperEnvironment.isRetrieveResults();
-                        Object message = new AdministratorActorInterface.ManageExecution(executionId, runtimeContext,
-                            stagingArea, retrieveResults, outPortPromises, finishTimeMillisPromise,
-                            executionExceptionPromise);
-                        Timeout localAskTimeout = cloudKeeperEnvironment.getLocalAskTimeout();
-                        return Patterns.ask(administrator, message, localAskTimeout);
-                    }
-                }, executionContext)
-                .map(TO_LONG_MAPPER, executionContext)
-                .map(new Mapper<Long, Long>() {
-                    @Override
-                    public Long apply(final Long executionId) {
-                        final ActorRef masterInterpreter = cloudKeeperEnvironment.getMasterInterpreter();
-                        // Now that the administrator is aware of the execution, can we route the cancellation future to
-                        // the master interpreter (and be sure that the cancellation event will transpire to the
-                        // administrator).
-                        cancellationPromise.future()
-                            .onFailure(new OnFailure() {
-                                @Override
-                                public void onFailure(Throwable throwable) {
-                                    masterInterpreter.tell(
-                                        new MasterInterpreterActorInterface.CancelWorkflow(executionId, throwable),
-                                        ActorRef.noSender()
-                                    );
-                                }
-                            }, executionContext);
-
+                .thenCompose(executionId -> {
+                    ActorRef administrator = cloudKeeperEnvironment.getAdministrator();
+                    boolean retrieveResults = cloudKeeperEnvironment.isRetrieveResults();
+                    Object message = new AdministratorActorInterface.ManageExecution(executionId, runtimeContext,
+                        stagingArea, retrieveResults, outPortPromises, finishTimeMillisPromise,
+                        executionExceptionPromise);
+                    Timeout localAskTimeout = cloudKeeperEnvironment.getLocalAskTimeout();
+                    return ScalaFutures.completableFutureOf(
+                        Patterns.ask(administrator, message, localAskTimeout)
+                            .map(TO_LONG_MAPPER, executionContext),
+                        executionContext
+                    );
+                })
+                .thenApply(executionId -> {
+                    ActorRef masterInterpreter = cloudKeeperEnvironment.getMasterInterpreter();
+                    // Now that the administrator is aware of the execution, can we route the cancellation future to
+                    // the master interpreter (and be sure that the cancellation event will transpire to the
+                    // administrator).
+                    cancellationPromise.exceptionally(throwable -> {
                         masterInterpreter.tell(
-                            new MasterInterpreterActorInterface.StartExecution(executionId), ActorRef.noSender());
+                            new MasterInterpreterActorInterface.CancelWorkflow(executionId, throwable),
+                            ActorRef.noSender()
+                        );
+                        return null;
+                    });
 
-                        outPortFuturesPromise.complete(new Success<>(ImmutableList.copyOf(outPortFutures)));
-                        return executionId;
-                    }
-                }, executionContext);
+                    masterInterpreter.tell(
+                        new MasterInterpreterActorInterface.StartExecution(executionId), ActorRef.noSender());
+
+                    outPortFuturesPromise.complete(ImmutableList.copyOf(outPortPromises));
+                    return executionId;
+                });
         }
 
         private static final class RuntimeState {
@@ -269,68 +257,60 @@ final class WorkflowExecutionBuilderImpl implements WorkflowExecutionBuilder {
                 this.runtimeContext = runtimeContext;
                 this.stagingArea = stagingArea;
             }
+
+            private StagingArea getStagingArea() {
+                return stagingArea;
+            }
+        }
+
+        private static WorkflowExecutionException mapThrowable(Throwable throwable) {
+            if (throwable instanceof WorkflowExecutionException) {
+                return (WorkflowExecutionException) throwable;
+            } else {
+                return new WorkflowExecutionException(throwable);
+            }
         }
 
         private WorkflowExecution createWorkflowExecution() {
-            Future<RuntimeContextFactory> runtimeContextFactoryFuture = ScalaFutures.supplySync(
-                () -> cloudKeeperEnvironment.getInstanceProvider().getInstance(RuntimeContextFactory.class)
+            CompletionStage<RuntimeContext> runtimeContextStage = Futures
+                .supply(() -> cloudKeeperEnvironment.getInstanceProvider().getInstance(RuntimeContextFactory.class))
+                .thenCompose(runtimeContextFactory -> runtimeContextFactory.newRuntimeContext(bundleIdentifiers));
+            CompletionStage<RuntimeState> runtimeStateStage = Futures.thenApplyAsync(
+                runtimeContextStage,
+                runtimeContext -> {
+                    RuntimeAnnotatedExecutionTrace executionTrace
+                        = runtimeContext.newAnnotatedExecutionTrace(ExecutionTrace.empty(), module, overrides);
+                    StagingArea stagingArea = cloudKeeperEnvironment
+                        .getStagingAreaProvider()
+                        .provideStaging(
+                            runtimeContext, executionTrace, cloudKeeperEnvironment.getInstanceProvider()
+                        );
+                    return new RuntimeState(runtimeContext, stagingArea);
+                },
+                executor
             );
-
-            Future<RuntimeState> runtimeStateFuture = runtimeContextFactoryFuture
-                .flatMap(new Mapper<RuntimeContextFactory, Future<RuntimeContext>>() {
-                    @Override
-                    public Future<RuntimeContext> apply(RuntimeContextFactory runtimeContextFactory) {
-                        return runtimeContextFactory.newRuntimeContext(bundleIdentifiers);
-                    }
-                }, executionContext)
-                .map(new Mapper<RuntimeContext, RuntimeState>() {
-                    @Override
-                    public RuntimeState checkedApply(RuntimeContext runtimeContext)
-                        throws LinkerException, InstanceProvisionException {
-                        RuntimeAnnotatedExecutionTrace executionTrace
-                            = runtimeContext.newAnnotatedExecutionTrace(ExecutionTrace.empty(), module, overrides);
-                        StagingArea stagingArea = cloudKeeperEnvironment
-                            .getStagingAreaProvider()
-                            .provideStaging(
-                                runtimeContext, executionTrace, cloudKeeperEnvironment.getInstanceProvider()
-                            );
-                        return new RuntimeState(runtimeContext, stagingArea);
-                    }
-                }, executionContext);
-
-            Future<StagingArea> stagingAreaFuture = runtimeStateFuture.map(new Mapper<RuntimeState, StagingArea>() {
-                @Override
-                public StagingArea apply(RuntimeState parameter) {
-                    return parameter.stagingArea;
-                }
-            }, executionContext);
-            stagingAreaPromise.completeWith(stagingAreaFuture);
-
-            Future<Long> executionIdFuture = runtimeStateFuture
-                .flatMap(new Mapper<RuntimeState, Future<Long>>() {
-                    @Override
-                    public Future<Long> checkedApply(RuntimeState runtimeState) throws WorkflowExecutionException {
-                        return createOutputFuturesAndStartExecution(
-                            runtimeState.runtimeContext, runtimeState.stagingArea);
-                    }
-                }, executionContext);
-            executionIdPromise.completeWith(executionIdFuture);
+            Futures.completeWith(stagingAreaPromise, runtimeStateStage.thenApply(RuntimeState::getStagingArea));
+            CompletionStage<Long> executionIdStage = Futures.thenCompose(
+                runtimeStateStage,
+                runtimeState
+                    -> createOutputFuturesAndStartExecution(runtimeState.runtimeContext, runtimeState.stagingArea)
+            );
+            Futures.completeWith(executionIdPromise, executionIdStage);
 
             // If executionIdPromise is completed with a failure, it is possible that those actions that would normally
             // complete the other promises are never run. Hence, we try to complete the promises exceptionally (to avoid
             // potential deadlocks by dangling promises).
-            executionIdFuture.onFailure(new OnFailure() {
-                @Override
-                public void onFailure(Throwable throwable) {
-                    outPortFuturesPromise.tryFailure(throwable);
-                    finishTimeMillisPromise.tryFailure(throwable);
-                    executionExceptionPromise.trySuccess(Option.some(mapThrowable(throwable)));
-                }
-            }, executionContext);
+            executionIdStage.exceptionally(throwable -> {
+                Throwable unwrapped = Futures.unwrapCompletionException(throwable);
+                outPortFuturesPromise.completeExceptionally(unwrapped);
+                finishTimeMillisPromise.completeExceptionally(unwrapped);
+                executionExceptionPromise.complete(Optional.of(mapThrowable(unwrapped)));
+                return null;
+            });
 
-            return new WorkflowExecutionImpl(executionContext, startTimeMillis,
-                stagingAreaPromise.future(), outPortFuturesPromise.future(), executionIdPromise.future(),
-                finishTimeMillisPromise.future(), executionExceptionPromise.future(), cancellationPromise);
+            return new WorkflowExecutionImpl(startTimeMillis,
+                stagingAreaPromise, outPortFuturesPromise, executionIdPromise,
+                finishTimeMillisPromise, executionExceptionPromise, cancellationPromise);
         }
     }
 
@@ -340,35 +320,23 @@ final class WorkflowExecutionBuilderImpl implements WorkflowExecutionBuilder {
         return context.createWorkflowExecution();
     }
 
-    static WorkflowExecutionException mapThrowable(Throwable throwable) {
-        if (throwable == null) {
-            return null;
-        } else if (throwable instanceof WorkflowExecutionException) {
-            return (WorkflowExecutionException) throwable;
-        } else {
-            return new WorkflowExecutionException(throwable);
-        }
-    }
-
     private static final class WorkflowExecutionImpl implements WorkflowExecution {
-        private final ExecutionContext executionContext;
         private final long startTimeMillis;
-        private final Future<StagingArea> stagingAreaFuture;
-        private final Future<ImmutableList<Future<Object>>> outPortFuturesFuture;
-        private final Future<Long> executionIdFuture;
-        private final Future<Long> finishTimeFuture;
-        private final Future<Option<WorkflowExecutionException>> executionExceptionFuture;
-        private final Promise<CancellationException> cancellationPromise;
+        private final CompletableFuture<StagingArea> stagingAreaFuture;
+        private final CompletableFuture<ImmutableList<CompletableFuture<Object>>> outPortFuturesFuture;
+        private final CompletableFuture<Long> executionIdFuture;
+        private final CompletableFuture<Long> finishTimeFuture;
+        private final CompletableFuture<Optional<WorkflowExecutionException>> executionExceptionFuture;
+        private final CompletableFuture<Void> cancellationPromise;
 
-        private WorkflowExecutionImpl(ExecutionContext executionContext,
+        private WorkflowExecutionImpl(
                 long startTimeMillis,
-                Future<StagingArea> stagingAreaFuture,
-                Future<ImmutableList<Future<Object>>> outPortFuturesFuture,
-                Future<Long> executionIdFuture,
-                Future<Long> finishTimeFuture,
-                Future<Option<WorkflowExecutionException>> executionExceptionFuture,
-                Promise<CancellationException> cancellationPromise) {
-            this.executionContext = executionContext;
+                CompletableFuture<StagingArea> stagingAreaFuture,
+                CompletableFuture<ImmutableList<CompletableFuture<Object>>> outPortFuturesFuture,
+                CompletableFuture<Long> executionIdFuture,
+                CompletableFuture<Long> finishTimeFuture,
+                CompletableFuture<Optional<WorkflowExecutionException>> executionExceptionFuture,
+                CompletableFuture<Void> cancellationPromise) {
             this.startTimeMillis = startTimeMillis;
             this.stagingAreaFuture = stagingAreaFuture;
             this.outPortFuturesFuture = outPortFuturesFuture;
@@ -385,55 +353,35 @@ final class WorkflowExecutionBuilderImpl implements WorkflowExecutionBuilder {
 
         @Override
         public boolean cancel() {
-            return isRunning()
-                && cancellationPromise.tryComplete(new Failure<>(new CancellationException()));
-        }
-
-        private static <T> CompletableFuture<T> completableFutureOf(Future<T> scalaFuture,
-                ExecutionContext executionContext) {
-            CompletableFuture<T> completableFuture = new CompletableFuture<>();
-            scalaFuture.onComplete(new OnComplete<T>() {
-                @Override
-                public void onComplete(@Nullable Throwable failure, @Nullable T success) {
-                    if (failure != null) {
-                        completableFuture.completeExceptionally(failure);
-                    } else {
-                        completableFuture.complete(success);
-                    }
-                }
-            }, executionContext);
-            return completableFuture;
+            // From CompletableFuture#cancel(boolean) API doc: "no effect in this implementation because interrupts are
+            // not used to control processing"
+            return isRunning() && cancellationPromise.cancel(true);
         }
 
         @Override
         public CompletableFuture<Long> getExecutionId() {
-            return completableFutureOf(executionIdFuture, executionContext);
+            return Futures.unwrapCompletionException(executionIdFuture);
         }
 
         @Override
         public CompletableFuture<RuntimeAnnotatedExecutionTrace> getTrace() {
-            Future<RuntimeAnnotatedExecutionTrace> scalaFuture
-                    = stagingAreaFuture.map(new Mapper<StagingArea, RuntimeAnnotatedExecutionTrace>() {
-                @Override
-                public RuntimeAnnotatedExecutionTrace apply(StagingArea stagingArea) {
-                    return stagingArea.getAnnotatedExecutionTrace();
-                }
-            }, executionContext);
-            return completableFutureOf(scalaFuture, executionContext);
+            return Futures.unwrapCompletionException(
+                stagingAreaFuture.thenApply(StagingArea::getAnnotatedExecutionTrace)
+            );
         }
 
         @Override
         public boolean isRunning() {
-            return !finishTimeFuture.isCompleted();
+            return !finishTimeFuture.isDone();
         }
 
-        private Future<Object> getOutputValueFuture(String outPortString, StagingArea stagingArea) {
+        private CompletableFuture<Object> getOutputValueFuture(String outPortString, StagingArea stagingArea) {
             final SimpleName outPortName = SimpleName.identifier(outPortString);
             RuntimeModule runtimeModule = stagingArea.getAnnotatedExecutionTrace().getModule();
 
             @Nullable RuntimePort port = runtimeModule.getEnclosedElement(RuntimePort.class, outPortName);
             if (!(port instanceof RuntimeOutPort)) {
-                return Futures.failed(new WorkflowExecutionException(String.format(
+                return Futures.completedExceptionally(new WorkflowExecutionException(String.format(
                     "Out-port with name '%s' does not exist in %s.",
                     outPortName, runtimeModule
                 )));
@@ -441,49 +389,35 @@ final class WorkflowExecutionBuilderImpl implements WorkflowExecutionBuilder {
             final int index = ((RuntimeOutPort) port).getOutIndex();
 
             return outPortFuturesFuture
-                .flatMap(new Mapper<ImmutableList<Future<Object>>, Future<Object>>() {
-                    @Override
-                    public Future<Object> apply(ImmutableList<Future<Object>> outPortFutures) {
-                        return outPortFutures.get(index);
-                    }
-                }, executionContext);
+                .thenCompose(outPortFutures -> outPortFutures.get(index));
         }
 
         @Override
         public CompletableFuture<Object> getOutput(String outPortName) {
-            Future<Object> outputValueFuture = stagingAreaFuture
-                .flatMap(new Mapper<StagingArea, Future<Object>>() {
-                    @Override
-                    public Future<Object> apply(StagingArea stagingArea) {
-                        return getOutputValueFuture(outPortName, stagingArea);
-                    }
-                }, executionContext);
-            return completableFutureOf(outputValueFuture, executionContext);
+            return Futures.unwrapCompletionException(
+                stagingAreaFuture.thenCompose(stagingArea -> getOutputValueFuture(outPortName, stagingArea))
+            );
         }
 
         @Override
         public CompletableFuture<Long> getFinishTimeMillis() {
-            return completableFutureOf(finishTimeFuture, executionContext);
+            return Futures.unwrapCompletionException(finishTimeFuture);
         }
 
         @Override
         public CompletableFuture<Void> toCompletableFuture() {
             CompletableFuture<Void> completableFuture = new CompletableFuture<>();
-            executionExceptionFuture.onComplete(new OnComplete<Option<WorkflowExecutionException>>() {
-                @Override
-                public void onComplete(@Nullable Throwable failure,
-                        @Nullable Option<WorkflowExecutionException> optionalException) {
-                    assert failure != null || optionalException != null;
-                    @Nullable Throwable actualFailure;
-                    if (failure != null) {
-                        completableFuture.completeExceptionally(failure);
-                    } else if (optionalException.isDefined()) {
-                        completableFuture.completeExceptionally(optionalException.get());
-                    } else {
-                        completableFuture.complete(null);
-                    }
+            executionExceptionFuture.whenComplete((optionalException, failure) -> {
+                assert (failure != null || optionalException != null)
+                    && !(failure instanceof CompletionException);
+                if (failure != null) {
+                    completableFuture.completeExceptionally(failure);
+                } else if (optionalException.isPresent()) {
+                    completableFuture.completeExceptionally(optionalException.get());
+                } else {
+                    completableFuture.complete(null);
                 }
-            }, executionContext);
+            });
             return completableFuture;
         }
     }

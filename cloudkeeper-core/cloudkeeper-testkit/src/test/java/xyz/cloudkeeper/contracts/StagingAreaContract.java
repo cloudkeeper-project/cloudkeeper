@@ -8,7 +8,6 @@ import org.testng.Assert;
 import org.testng.ITest;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-import scala.concurrent.Future;
 import xyz.cloudkeeper.dsl.ModuleFactory;
 import xyz.cloudkeeper.dsl.SimpleModule;
 import xyz.cloudkeeper.dsl.SimpleModulePlugin;
@@ -36,6 +35,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Contract test for basic staging-area functionality.
@@ -76,8 +76,8 @@ public final class StagingAreaContract implements ITest {
         return provider.getClass().getName();
     }
 
-    private <T> T await(Future<T> awaitable) throws Exception {
-        return provider.await(awaitable);
+    private <T> T await(CompletableFuture<T> future) throws Exception {
+        return provider.await(future);
     }
 
     @BeforeClass

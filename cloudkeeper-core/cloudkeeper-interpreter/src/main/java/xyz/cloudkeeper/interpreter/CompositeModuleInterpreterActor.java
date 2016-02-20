@@ -4,12 +4,10 @@ import akka.actor.ActorRef;
 import akka.actor.PoisonPill;
 import akka.actor.Terminated;
 import akka.actor.UntypedActor;
-import akka.dispatch.Futures;
-import akka.dispatch.Mapper;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
 import akka.japi.Creator;
-import scala.concurrent.Future;
+import net.florianschoppmann.java.futures.Futures;
 import xyz.cloudkeeper.interpreter.DependencyGraph.DependencyGraphNode;
 import xyz.cloudkeeper.interpreter.DependencyGraph.HasValue;
 import xyz.cloudkeeper.interpreter.DependencyGraph.InPortNode;
@@ -45,6 +43,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 import static xyz.cloudkeeper.interpreter.InterpreterInterface.InPortHasSignal;
@@ -367,13 +366,8 @@ final class CompositeModuleInterpreterActor extends AbstractModuleInterpreterAct
      */
     private void asynchronousHasValueCheck(ValueNode valueNode) {
         ExecutionTrace executionTrace = valueNode.getExecutionTrace();
-        Future<Object> messageFuture = stagingArea.exists(executionTrace)
-            .map(new Mapper<Boolean, Object>() {
-                @Override
-                public Object apply(Boolean executionTraceExists) {
-                    return new FinishedStagingAreaOperation(valueNode, executionTraceExists);
-                }
-            }, getAsyncTaskContext());
+        CompletableFuture<Object> messageFuture = stagingArea.exists(executionTrace)
+            .thenApply(exists -> new FinishedStagingAreaOperation(valueNode, exists));
         pipeResultToSelf(messageFuture, "checking if staging area contains execution trace '%s'",
             executionTrace);
     }
@@ -506,7 +500,7 @@ final class CompositeModuleInterpreterActor extends AbstractModuleInterpreterAct
      * <p>The visitor returns a future that will be completed with the target execution trace.
      */
     private final class TransmitFromSourcePortVisitor
-            implements RuntimeConnectionVisitor<Future<RuntimeExecutionTrace>, RuntimePort> {
+            implements RuntimeConnectionVisitor<CompletableFuture<Void>, RuntimePort> {
         /**
          * Returns a future representing the staging-area copy operation (which will send the given message upon
          * completion).
@@ -518,23 +512,20 @@ final class CompositeModuleInterpreterActor extends AbstractModuleInterpreterAct
          *
          * <p>For simplicity, however, this method always starts an asynchronous action.
          */
-        private Future<RuntimeExecutionTrace> startCopyAndSendMessage(ExecutionTrace copyFromExecutionTrace,
+        private CompletableFuture<Void> startCopyAndSendMessage(ExecutionTrace copyFromExecutionTrace,
                 ExecutionTrace copyToExecutionTrace, final Object message, final ActorRef messageTarget) {
-            Future<RuntimeExecutionTrace> copyFuture = stagingArea
+            CompletableFuture<Void> copyFuture = stagingArea
                 .copy(copyFromExecutionTrace, copyToExecutionTrace)
-                .map(new Mapper<RuntimeExecutionTrace, RuntimeExecutionTrace>() {
-                    @Override
-                    public RuntimeExecutionTrace apply(RuntimeExecutionTrace executionTrace) {
-                        messageTarget.tell(message, getSelf());
-                        return executionTrace;
-                    }
-                }, getAsyncTaskContext());
+                .thenApply(ignored -> {
+                    messageTarget.tell(message, getSelf());
+                    return null;
+                });
             awaitAsynchronousAction(copyFuture, "copying from '%s' to '%s'", copyFromExecutionTrace,
                 copyToExecutionTrace);
             return copyFuture;
         }
 
-        private Future<RuntimeExecutionTrace> triggerSubmodule(RuntimeConnection connection,
+        private CompletableFuture<Void> triggerSubmodule(RuntimeConnection connection,
                 ExecutionTrace copyFromExecutionTrace) {
             RuntimeInPort toPort = (RuntimeInPort) connection.getToPort();
             RuntimeModule toModule = toPort.getModule();
@@ -548,7 +539,7 @@ final class CompositeModuleInterpreterActor extends AbstractModuleInterpreterAct
         }
 
         @Override
-        public Future<RuntimeExecutionTrace> visitSiblingConnection(RuntimeSiblingConnection connection,
+        public CompletableFuture<Void> visitSiblingConnection(RuntimeSiblingConnection connection,
                 @Nullable RuntimePort fromPort) {
             assert fromPort != null;
             return triggerSubmodule(
@@ -559,13 +550,13 @@ final class CompositeModuleInterpreterActor extends AbstractModuleInterpreterAct
         }
 
         @Override
-        public Future<RuntimeExecutionTrace> visitParentInToChildInConnection(
+        public CompletableFuture<Void> visitParentInToChildInConnection(
                 RuntimeParentInToChildInConnection connection, @Nullable RuntimePort fromPort) {
             assert fromPort != null;
             return triggerSubmodule(connection, ExecutionTrace.empty().resolveInPort(fromPort.getSimpleName()));
         }
 
-        private Future<RuntimeExecutionTrace> triggerSelf(RuntimeConnection connection,
+        private CompletableFuture<Void> triggerSelf(RuntimeConnection connection,
                 ExecutionTrace copyFromExecutionTrace) {
             RuntimeOutPort toPort = (RuntimeOutPort) connection.getToPort();
             ExecutionTrace copyToExecutionTrace = ExecutionTrace.empty().resolveOutPort(toPort.getSimpleName());
@@ -577,7 +568,7 @@ final class CompositeModuleInterpreterActor extends AbstractModuleInterpreterAct
         }
 
         @Override
-        public Future<RuntimeExecutionTrace> visitChildOutToParentOutConnection(
+        public CompletableFuture<Void> visitChildOutToParentOutConnection(
                 RuntimeChildOutToParentOutConnection connection, @Nullable RuntimePort fromPort) {
             assert fromPort != null;
             return triggerSelf(
@@ -588,7 +579,7 @@ final class CompositeModuleInterpreterActor extends AbstractModuleInterpreterAct
         }
 
         @Override
-        public Future<RuntimeExecutionTrace> visitShortCircuitConnection(RuntimeShortCircuitConnection connection,
+        public CompletableFuture<Void> visitShortCircuitConnection(RuntimeShortCircuitConnection connection,
                 @Nullable RuntimePort fromPort) {
             assert fromPort != null;
             return triggerSelf(connection, ExecutionTrace.empty().resolveInPort(fromPort.getSimpleName()));
@@ -626,17 +617,12 @@ final class CompositeModuleInterpreterActor extends AbstractModuleInterpreterAct
             ));
         } else if (isOutPortNeeded(outPort)) {
             submoduleOutPortsReceivedMessage[moduleId].set(outPortId);
-            List<Future<RuntimeExecutionTrace>> copyFutures = outPort.getOutConnections().stream()
+            List<CompletableFuture<Void>> copyFutures = outPort.getOutConnections().stream()
                 .filter(this::isConnectionToRecomputedNode)
                 .map(connection -> connection.accept(transmitFromSourcePortVisitor, outPort))
                 .collect(Collectors.toList());
-            Future<Object> messageFuture = Futures.sequence(copyFutures, getAsyncTaskContext())
-                .map(new Mapper<Iterable<RuntimeExecutionTrace>, Object>() {
-                    @Override
-                    public Object apply(Iterable<RuntimeExecutionTrace> parameter) {
-                        return new SubmoduleOutPortNoLongerNeeded(outPort);
-                    }
-                }, getAsyncTaskContext());
+            CompletableFuture<Object> messageFuture = Futures.collect(copyFutures)
+                .thenApply(ignored -> new SubmoduleOutPortNoLongerNeeded(outPort));
             pipeResultToSelf(messageFuture, "copying value of %s of submodule to out-connections",
                 outPort, outPort.getSimpleName());
         } else {
@@ -736,7 +722,7 @@ final class CompositeModuleInterpreterActor extends AbstractModuleInterpreterAct
         if (neededOutPorts.isEmpty() && getInterpreterProperties().isCleaningRequested()) {
             ExecutionTrace executionTrace
                 = ExecutionTrace.empty().resolveContent().resolveModule(submodule.getSimpleName());
-            Future<RuntimeExecutionTrace> future = stagingArea.delete(executionTrace);
+            CompletableFuture<Void> future = stagingArea.delete(executionTrace);
             awaitAsynchronousAction(future, "cleaning up intermediate output of submodule '%s'",
                 submodule.getSimpleName());
         }

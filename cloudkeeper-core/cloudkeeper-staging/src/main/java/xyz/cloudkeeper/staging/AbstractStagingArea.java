@@ -1,8 +1,7 @@
 package xyz.cloudkeeper.staging;
 
-import akka.japi.Option;
 import cloudkeeper.types.ByteSequence;
-import scala.concurrent.Future;
+import net.florianschoppmann.java.futures.CheckedSupplier;
 import xyz.cloudkeeper.marshaling.MarshalingTreeNode;
 import xyz.cloudkeeper.marshaling.MarshalingTreeNode.ByteSequenceNode;
 import xyz.cloudkeeper.marshaling.MarshalingTreeNode.MarshaledObjectNode;
@@ -32,7 +31,9 @@ import java.io.IOException;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 /**
@@ -45,7 +46,7 @@ import java.util.stream.Collectors;
  * letting {@link IOException}s propagate is fine).
  *
  * <p>Implementations of this abstract class can choose between asynchronous or synchronous execution by implementing
- * the {@link #toFuture(Callable, String, Object...)} accordingly.
+ * the {@link #toFuture(IOCheckedSupplier, String, Object...)} accordingly.
  */
 public abstract class AbstractStagingArea implements StagingArea {
     private final RuntimeAnnotatedExecutionTrace executionTrace;
@@ -66,16 +67,28 @@ public abstract class AbstractStagingArea implements StagingArea {
     }
 
     /**
-     * Returns a {@link Future} object that will be completed with the result of the given {@link Callable}.
+     * Supplier that may throw an {@link IOException}, but not other checked exception.
      *
-     * @param callable the computation
+     * @param <T> the type of results supplied by this supplier
+     */
+    @FunctionalInterface
+    protected interface IOCheckedSupplier<T> extends CheckedSupplier<T> {
+        @Nullable
+        @Override
+        T checkedGet() throws IOException;
+    }
+
+    /**
+     * Returns a new {@link CompletableFuture} that will be completed with the result of the given {@link Callable}.
+     *
+     * @param supplier the computation
      * @param format A format string that can be passed to {@link String#format(Locale, String, Object...)}. This should
      *     This should be an infinitive clause (without the "to") that could be appended to "Failed to ...".
      * @param args arguments referenced by the format specifiers in the format string
      * @param <T> type of the future
-     * @return the {@link Future} object
+     * @return the new {@link CompletableFuture}
      */
-    protected abstract <T> Future<T> toFuture(Callable<T> callable, String format, Object... args);
+    protected abstract <T> CompletableFuture<T> toFuture(IOCheckedSupplier<T> supplier, String format, Object... args);
 
     @Override
     public final RuntimeAnnotatedExecutionTrace getAnnotatedExecutionTrace() {
@@ -119,7 +132,7 @@ public abstract class AbstractStagingArea implements StagingArea {
         throws IOException;
 
     @Override
-    public final Future<RuntimeExecutionTrace> delete(RuntimeExecutionTrace prefix) {
+    public final CompletableFuture<Void> delete(RuntimeExecutionTrace prefix) {
         Objects.requireNonNull(prefix);
         RuntimeExecutionTrace callStack = prefix.getFrames();
         RuntimeExecutionTrace reference = prefix.getReference();
@@ -138,7 +151,7 @@ public abstract class AbstractStagingArea implements StagingArea {
 
         return toFuture(() -> {
             delete(prefix, absolutePrefix);
-            return prefix;
+            return null;
         }, "delete %s", absolutePrefix);
     }
 
@@ -165,7 +178,7 @@ public abstract class AbstractStagingArea implements StagingArea {
         throws IOException;
 
     @Override
-    public final Future<RuntimeExecutionTrace> copy(RuntimeExecutionTrace source, RuntimeExecutionTrace target) {
+    public final CompletableFuture<Void> copy(RuntimeExecutionTrace source, RuntimeExecutionTrace target) {
         requireRelativeTraceWithReference(source);
         requireRelativeTraceWithReference(target);
         RuntimeAnnotatedExecutionTrace absoluteSource = executionTrace.resolveExecutionTrace(source);
@@ -174,7 +187,7 @@ public abstract class AbstractStagingArea implements StagingArea {
         return toFuture(() -> {
             preWrite(target, absoluteTarget);
             copy(source, target, absoluteSource, absoluteTarget);
-            return target;
+            return null;
         }, "copy from %s to %s", absoluteSource, absoluteTarget);
     }
 
@@ -198,7 +211,7 @@ public abstract class AbstractStagingArea implements StagingArea {
         Object object) throws IOException;
 
     @Override
-    public final Future<RuntimeExecutionTrace> putObject(RuntimeExecutionTrace target, Object object) {
+    public final CompletableFuture<Void> putObject(RuntimeExecutionTrace target, Object object) {
         requireRelativeTraceWithReference(target);
         Objects.requireNonNull(object);
         RuntimeAnnotatedExecutionTrace absoluteTarget = executionTrace.resolveExecutionTrace(target);
@@ -206,7 +219,7 @@ public abstract class AbstractStagingArea implements StagingArea {
         return toFuture(() -> {
             preWrite(target, absoluteTarget);
             putObject(target, absoluteTarget, object);
-            return target;
+            return null;
         }, "write object at %s", absoluteTarget);
     }
 
@@ -231,7 +244,7 @@ public abstract class AbstractStagingArea implements StagingArea {
         throws IOException;
 
     @Override
-    public final Future<RuntimeExecutionTrace> putSerializationTree(RuntimeExecutionTrace target,
+    public final CompletableFuture<Void> putSerializationTree(RuntimeExecutionTrace target,
             RuntimeSerializationRoot serializationTree) {
         requireRelativeTraceWithReference(target);
         Objects.requireNonNull(serializationTree);
@@ -240,7 +253,7 @@ public abstract class AbstractStagingArea implements StagingArea {
         return toFuture(() -> {
             preWrite(target, absoluteTarget);
             putSerializationTree(target, absoluteTarget, serializationTree);
-            return target;
+            return null;
         }, "write persistence tree at %s", absoluteTarget);
     }
 
@@ -257,7 +270,7 @@ public abstract class AbstractStagingArea implements StagingArea {
         throws IOException;
 
     @Override
-    public final Future<Object> getObject(RuntimeExecutionTrace source) {
+    public final CompletableFuture<Object> getObject(RuntimeExecutionTrace source) {
         requireRelativeTraceWithReference(source);
         RuntimeAnnotatedExecutionTrace absoluteSource = executionTrace.resolveExecutionTrace(source);
 
@@ -277,7 +290,7 @@ public abstract class AbstractStagingArea implements StagingArea {
         throws IOException;
 
     @Override
-    public final Future<Boolean> exists(RuntimeExecutionTrace source) {
+    public final CompletableFuture<Boolean> exists(RuntimeExecutionTrace source) {
         requireRelativeTraceWithReference(source);
         RuntimeAnnotatedExecutionTrace absoluteSource = executionTrace.resolveExecutionTrace(source);
 
@@ -292,14 +305,15 @@ public abstract class AbstractStagingArea implements StagingArea {
      *     {@link RuntimeExecutionTrace#getReference()} is guaranteed non-empty.
      * @param absoluteTrace the result of {@code getAnnotatedExecutionTrace().resolveExecutionTrace(trace)}
      * @param upperBound upper bound on the index that will be returned; may be null if there is no upper bound
-     * @return maximum index present at the given execution trace or an empty {@link Option} if no index exists
+     * @return maximum index present at the given execution trace or an empty {@link Optional} if no index exists
      * @throws IOException if an I/O error occurs
      */
-    protected abstract Option<Index> getMaximumIndex(RuntimeExecutionTrace trace,
+    protected abstract Optional<Index> getMaximumIndex(RuntimeExecutionTrace trace,
         RuntimeAnnotatedExecutionTrace absoluteTrace, @Nullable Index upperBound) throws IOException;
 
     @Override
-    public final Future<Option<Index>> getMaximumIndex(RuntimeExecutionTrace trace, @Nullable Index upperBound) {
+    public final CompletableFuture<Optional<Index>> getMaximumIndex(RuntimeExecutionTrace trace,
+            @Nullable Index upperBound) {
         if (trace.getType() != RuntimeExecutionTrace.Type.CONTENT) {
             throw new IllegalArgumentException(String.format(
                 "Expected relative trace of type %s, but got '%s'.", RuntimeExecutionTrace.Type.CONTENT, trace

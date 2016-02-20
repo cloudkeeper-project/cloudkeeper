@@ -1,6 +1,5 @@
 package xyz.cloudkeeper.s3;
 
-import akka.dispatch.ExecutionContexts;
 import com.amazonaws.AmazonClientException;
 import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.auth.DefaultAWSCredentialsProviderChain;
@@ -10,10 +9,6 @@ import org.testng.Assert;
 import org.testng.SkipException;
 import org.testng.annotations.AfterSuite;
 import org.testng.annotations.Factory;
-import scala.concurrent.Await;
-import scala.concurrent.ExecutionContext;
-import scala.concurrent.Future;
-import scala.concurrent.duration.Duration;
 import xyz.cloudkeeper.contracts.RemoteStagingAreaContract;
 import xyz.cloudkeeper.contracts.StagingAreaContract;
 import xyz.cloudkeeper.contracts.StagingAreaContractProvider;
@@ -25,6 +20,8 @@ import xyz.cloudkeeper.s3.io.S3Connection;
 import xyz.cloudkeeper.s3.io.S3ConnectionBuilder;
 
 import javax.annotation.Nullable;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -49,7 +46,7 @@ import java.util.concurrent.TimeUnit;
 public class ITS3StagingArea {
     private static final String KEY_PREFIX = ITS3StagingArea.class.getName() + '/';
 
-    private static final Duration AWAIT_DURATION = Duration.create(1, TimeUnit.MINUTES);
+    private static final long AWAIT_DURATION_MILLIS = 1000;
 
     private final InstanceProvider instanceProvider = new InstanceProviderImpl();
     @Nullable private AmazonClientException credentialsException = null;
@@ -57,7 +54,6 @@ public class ITS3StagingArea {
     @Nullable private S3Connection s3Connection = null;
     @Nullable private String s3Bucket;
     @Nullable private ScheduledExecutorService executorService;
-    @Nullable private ExecutionContext executionContext;
 
     public void setup() {
         AWSCredentialsProvider awsCredentialsProvider = new DefaultAWSCredentialsProviderChain();
@@ -71,7 +67,6 @@ public class ITS3StagingArea {
 
             if (s3Bucket != null) {
                 executorService = Executors.newScheduledThreadPool(4);
-                executionContext = ExecutionContexts.fromExecutorService(executorService);
 
                 AmazonS3 s3Client = new AmazonS3Client(awsCredentialsProvider);
                 s3Connection = new S3ConnectionBuilder(s3Client, executorService).build();
@@ -127,15 +122,15 @@ public class ITS3StagingArea {
         @Override
         public StagingArea getStagingArea(String identifier, RuntimeContext runtimeContext,
                 RuntimeAnnotatedExecutionTrace executionTrace) {
-            assert s3Connection != null && s3Bucket != null && executionContext != null;
-            return new S3StagingArea.Builder(executionTrace, s3Connection, s3Bucket, executionContext, runtimeContext)
+            assert s3Connection != null && s3Bucket != null && executorService != null;
+            return new S3StagingArea.Builder(executionTrace, s3Connection, s3Bucket, executorService, runtimeContext)
                 .setKeyPrefix(KEY_PREFIX)
                 .build();
         }
 
         @Override
-        public <T> T await(Future<T> future) throws Exception {
-            return Await.result(future, AWAIT_DURATION);
+        public <T> T await(CompletableFuture<T> future) throws Exception {
+            return future.get(AWAIT_DURATION_MILLIS, TimeUnit.MILLISECONDS);
         }
     }
 
@@ -147,9 +142,9 @@ public class ITS3StagingArea {
         @SuppressWarnings("unchecked")
         @Override
         public <T> T getInstance(Class<T> requestedClass) {
-            assert executionContext != null && s3Connection != null;
-            if (ExecutionContext.class.equals(requestedClass)) {
-                return (T) executionContext;
+            assert executorService != null && s3Connection != null;
+            if (Executor.class.equals(requestedClass)) {
+                return (T) executorService;
             } else if (S3Connection.class.equals(requestedClass)) {
                 return (T) s3Connection;
             } else {

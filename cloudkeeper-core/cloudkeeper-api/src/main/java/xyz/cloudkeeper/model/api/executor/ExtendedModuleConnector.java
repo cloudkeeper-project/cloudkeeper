@@ -1,8 +1,9 @@
 package xyz.cloudkeeper.model.api.executor;
 
-import scala.concurrent.Future;
 import xyz.cloudkeeper.model.api.Executable;
 import xyz.cloudkeeper.model.api.ModuleConnector;
+
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Extended {@link ModuleConnector} interface, providing additional functionality for use by
@@ -24,11 +25,10 @@ public interface ExtendedModuleConnector extends ModuleConnector, AutoCloseable 
      * <p>Only this method writes values to the staging area. If this method is not called, the staging area is
      * guaranteed to be remain unmodified.
      *
-     * @return Future that will be completed with an implementation-defined value on success and a
-     *     {@link xyz.cloudkeeper.model.api.staging.StagingException} or {@link IncompleteOutputsException} on
-     *     failure (unless the {@link Throwable} is not an {@link Exception}).
+     * @return Future that will normally be completed once all values have been committed to the staging area. It will
+     *     exceptionally be completed with an {@link java.io.IOException} or {@link IncompleteOutputsException}.
      */
-    Future<Object> commit();
+    CompletableFuture<Void> commit();
 
     /**
      * Releases all system resources acquired by the module connector.

@@ -1,9 +1,5 @@
 package xyz.cloudkeeper.executors;
 
-import akka.japi.Option;
-import scala.concurrent.Await;
-import scala.concurrent.Future;
-import scala.concurrent.duration.Duration;
 import xyz.cloudkeeper.model.api.ExecutionException;
 import xyz.cloudkeeper.model.api.RuntimeStateProvider;
 import xyz.cloudkeeper.model.api.executor.SimpleModuleExecutor;
@@ -21,6 +17,7 @@ import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.io.Serializable;
 import java.util.UUID;
+import javax.annotation.Nullable;
 
 /**
  * This class consists of static methods for executing a simple-module encoded in an input stream and writing the result
@@ -42,8 +39,7 @@ public final class ForkedExecutors {
      *
      * <p>The output {@link SimpleModuleExecutorResult} is written to the output stream using
      * {@link CharacterStreamCommunication#writeObject(Serializable, Appendable, String)}. Accordingly, it is acceptable
-     * for {@link SimpleModuleExecutor#submit(RuntimeStateProvider, Future)} to also write to the same
-     * {@link OutputStream}.
+     * for {@link SimpleModuleExecutor#submit(RuntimeStateProvider)} to also write to the same {@link OutputStream}.
      *
      * <p>Note that this method returns only after execution of the simple module has finished.
      *
@@ -65,20 +61,19 @@ public final class ForkedExecutors {
         try (ObjectInputStream objectInputStream = new ObjectInputStream(new NonClosingInputStream(inputStream))) {
             RuntimeStateProvider runtimeStateProvider = (RuntimeStateProvider) objectInputStream.readObject();
 
-            SimpleModuleExecutorResult executorResult
-                = Await.result(simpleModuleExecutor.submit(runtimeStateProvider, null), Duration.Inf());
-            Option<ExecutionException> optionalException = executorResult.getExecutionException();
+            SimpleModuleExecutorResult executorResult = simpleModuleExecutor.submit(runtimeStateProvider).get();
+            @Nullable ExecutionException exception = executorResult.getExecutionException();
             resultBuilder.addExecutionResult(executorResult);
-            if (optionalException.isDefined()) {
-                resultBuilder.setException(optionalException.get().toImmunizedException());
+            if (exception != null) {
+                resultBuilder.setException(exception.toImmunizedException());
             }
         } catch (IOException | ClassNotFoundException exception) {
             resultBuilder.setException(
                 new ExecutionException("Forked simple-module executor failed to read and deserialize input.", exception)
             );
-        } catch (Exception exception) {
-            ExecutionException executionException
-                = new ExecutionException("Unexpected exception in forked simple-module executor.", exception);
+        } catch (InterruptedException | java.util.concurrent.ExecutionException exception) {
+            ExecutionException executionException = new ExecutionException(
+                "Unexpected exception in forked simple-module executor.", exception);
             resultBuilder.setException(executionException.toImmunizedException());
         }
         resultBuilder.addProperty(SimpleModuleExecutor.COMPLETION_TIME_MILLIS, System.currentTimeMillis());

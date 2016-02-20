@@ -2,7 +2,6 @@ package xyz.cloudkeeper.interpreter;
 
 import akka.actor.ActorRef;
 import akka.util.Timeout;
-import scala.concurrent.ExecutionContext;
 import xyz.cloudkeeper.model.api.CloudKeeperEnvironment;
 import xyz.cloudkeeper.model.api.WorkflowExecutionBuilder;
 import xyz.cloudkeeper.model.api.staging.InstanceProvider;
@@ -11,9 +10,10 @@ import xyz.cloudkeeper.model.bare.element.module.BareModule;
 import xyz.cloudkeeper.model.util.ImmutableList;
 
 import java.util.Objects;
+import java.util.concurrent.Executor;
 
 final class CloudKeeperEnvironmentImpl implements CloudKeeperEnvironment {
-    private final ExecutionContext executionContext;
+    private final Executor runnableExecutor;
     private final String instanceProviderActorPath;
     private final InstanceProvider instanceProvider;
     private final InterpreterPropsProvider interpreterPropsProvider;
@@ -27,12 +27,12 @@ final class CloudKeeperEnvironmentImpl implements CloudKeeperEnvironment {
     private final Timeout remoteAskTimeout;
     private final Timeout localAskTimeout;
 
-    CloudKeeperEnvironmentImpl(ExecutionContext executionContext, String instanceProviderActorPath,
+    CloudKeeperEnvironmentImpl(Executor runnableExecutor, String instanceProviderActorPath,
             InstanceProvider instanceProvider, InterpreterPropsProvider interpreterPropsProvider,
             StagingAreaProvider stagingAreaProvider, ActorRef administrator, ActorRef masterInterpreter,
             ActorRef executor, ImmutableList<EventSubscription> eventSubscriptions, boolean cleaningRequested,
             boolean retrieveResults, Timeout remoteAskTimeout, Timeout localAskTimeout) {
-        this.executionContext = Objects.requireNonNull(executionContext);
+        this.runnableExecutor = Objects.requireNonNull(runnableExecutor);
         this.instanceProviderActorPath = Objects.requireNonNull(instanceProviderActorPath);
         this.instanceProvider = Objects.requireNonNull(instanceProvider);
         this.interpreterPropsProvider = Objects.requireNonNull(interpreterPropsProvider);
@@ -47,8 +47,8 @@ final class CloudKeeperEnvironmentImpl implements CloudKeeperEnvironment {
         this.localAskTimeout = Objects.requireNonNull(localAskTimeout);
     }
 
-    ExecutionContext getExecutionContext() {
-        return executionContext;
+    Executor getRunnableExecutor() {
+        return runnableExecutor;
     }
 
     String getInstanceProviderActorPath() {

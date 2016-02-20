@@ -1,6 +1,8 @@
 package xyz.cloudkeeper.executors;
 
 import akka.japi.Option;
+import net.florianschoppmann.java.futures.Futures;
+import net.florianschoppmann.java.type.AbstractTypes;
 import org.slf4j.LoggerFactory;
 import scala.concurrent.Future;
 import xyz.cloudkeeper.filesystem.FileStagingArea;
@@ -42,6 +44,8 @@ public final class DummyProcess {
                 LocalSimpleModuleExecutor.class, // cloudkeeper-basic
                 StagingAreaProvider.class, // cloudkeeper-api
                 Linker.class, // cloudkeeper-linker
+                AbstractTypes.class, // java-types
+                Futures.class, // java-futures
                 Option.class, // akka-actor
                 Future.class, // scala-library
                 LoggerFactory.class // slf4j-api

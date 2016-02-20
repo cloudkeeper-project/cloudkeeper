@@ -21,7 +21,7 @@ public final class EndSimpleModuleTraceEvent extends EndExecutionTraceEvent {
     private EndSimpleModuleTraceEvent(long executionId, long timestamp, RuntimeExecutionTrace executionTrace,
             @Nullable SimpleModuleExecutorResult moduleExecutorResult) {
         super(executionId, timestamp, executionTrace,
-            moduleExecutorResult != null && moduleExecutorResult.getExecutionException().isEmpty());
+            moduleExecutorResult != null && moduleExecutorResult.getExecutionException() == null);
         this.moduleExecutorResult = moduleExecutorResult;
     }
 

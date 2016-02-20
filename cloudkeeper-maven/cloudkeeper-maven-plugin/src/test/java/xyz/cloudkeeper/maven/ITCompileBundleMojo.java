@@ -1,6 +1,5 @@
 package xyz.cloudkeeper.maven;
 
-import akka.dispatch.ExecutionContexts;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugin.testing.AbstractMojoTestCase;
 import org.apache.maven.project.MavenProject;
@@ -10,9 +9,6 @@ import org.eclipse.aether.RepositorySystem;
 import org.eclipse.aether.artifact.Artifact;
 import org.eclipse.aether.artifact.DefaultArtifact;
 import org.junit.Assert;
-import scala.concurrent.Await;
-import scala.concurrent.ExecutionContext;
-import scala.concurrent.duration.Duration;
 import xyz.cloudkeeper.examples.modules.BinarySum;
 import xyz.cloudkeeper.examples.modules.Decrease;
 import xyz.cloudkeeper.model.LinkerException;
@@ -48,12 +44,11 @@ import java.util.concurrent.TimeUnit;
  * transitively depends on 3.3.1, and this is the only version that should be present).
  */
 public class ITCompileBundleMojo extends AbstractMojoTestCase {
-    private static final Duration RUNTIME_CONTEXT_DURATION = Duration.create(1, TimeUnit.MINUTES);
+    private static final long RUNTIME_CONTEXT_DURATION_MS = 1000;
 
     private Path tempDir;
     private Unmarshaller unmarshaller;
     private ExecutorService executorService;
-    private ExecutionContext executionContext;
 
     private Date startDate;
     private DummyAetherRepository aetherRepository;
@@ -65,7 +60,6 @@ public class ITCompileBundleMojo extends AbstractMojoTestCase {
         unmarshaller = jaxbContext.createUnmarshaller();
         tempDir = Files.createTempDirectory(getClass().getSimpleName());
         executorService = Executors.newFixedThreadPool(1);
-        executionContext = ExecutionContexts.fromExecutorService(executorService);
 
         startDate = new Date();
         aetherRepository = new DummyAetherRepository(tempDir);
@@ -128,15 +122,14 @@ public class ITCompileBundleMojo extends AbstractMojoTestCase {
 
         // Load the bundle with a bundle URI
         MavenRuntimeContextFactory runtimeContextFactory = new MavenRuntimeContextFactory.Builder(
-                executionContext, aetherRepository.getRepositorySystem(), aetherRepository.getRepositorySystemSession())
+                executorService, aetherRepository.getRepositorySystem(), aetherRepository.getRepositorySystemSession())
             .build();
         URI bundleIdentifier = Bundles.bundleIdentifierFromMaven(
             project.getGroupId(), project.getArtifactId(), Version.valueOf(project.getVersion()));
         try (
-            RuntimeContext runtimeContext = Await.result(
-                runtimeContextFactory.newRuntimeContext(Collections.singletonList(bundleIdentifier)),
-                RUNTIME_CONTEXT_DURATION
-            )
+            RuntimeContext runtimeContext = runtimeContextFactory
+                .newRuntimeContext(Collections.singletonList(bundleIdentifier))
+                .get(RUNTIME_CONTEXT_DURATION_MS, TimeUnit.MILLISECONDS)
         ) {
             // Sanity check: Linking needs to succeed
             RuntimeModuleDeclaration binarySumDeclaration = runtimeContext.getRepository().getElement(

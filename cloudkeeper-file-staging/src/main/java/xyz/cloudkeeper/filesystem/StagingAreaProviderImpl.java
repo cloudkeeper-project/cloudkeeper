@@ -1,6 +1,5 @@
 package xyz.cloudkeeper.filesystem;
 
-import scala.concurrent.ExecutionContext;
 import xyz.cloudkeeper.model.api.RuntimeContext;
 import xyz.cloudkeeper.model.api.staging.InstanceProvider;
 import xyz.cloudkeeper.model.api.staging.InstanceProvisionException;
@@ -13,6 +12,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
 
 final class StagingAreaProviderImpl implements StagingAreaProvider {
@@ -31,13 +31,13 @@ final class StagingAreaProviderImpl implements StagingAreaProvider {
     @Override
     public StagingArea provideStaging(RuntimeContext runtimeContext, RuntimeAnnotatedExecutionTrace executionTrace,
             InstanceProvider instanceProvider) throws InstanceProvisionException {
-        ExecutionContext executionContext = instanceProvider.getInstance(ExecutionContext.class);
+        Executor executor = instanceProvider.getInstance(Executor.class);
         Path basePath = Paths.get(baseURI);
         List<Path> hardlinkEnabledPaths = hardlinkEnabledURIs
             .stream()
             .map(Paths::get)
             .collect(Collectors.toList());
-        return new FileStagingArea.Builder(runtimeContext, executionTrace, basePath, executionContext)
+        return new FileStagingArea.Builder(runtimeContext, executionTrace, basePath, executor)
             .setHardLinkEnabledPaths(hardlinkEnabledPaths)
             .build();
     }

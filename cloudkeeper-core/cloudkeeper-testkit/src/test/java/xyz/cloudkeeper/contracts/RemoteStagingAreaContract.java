@@ -3,7 +3,6 @@ package xyz.cloudkeeper.contracts;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-import scala.concurrent.Future;
 import xyz.cloudkeeper.examples.modules.Fibonacci;
 import xyz.cloudkeeper.model.api.staging.InstanceProvider;
 import xyz.cloudkeeper.model.api.staging.StagingArea;
@@ -17,6 +16,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Contract test for remote staging-provider functionality.
@@ -50,7 +50,7 @@ public final class RemoteStagingAreaContract {
         instanceProvider = helper.getInstanceProvider(specificInstanceProvider);
     }
 
-    private <T> T await(Future<T> awaitable) throws Exception {
+    private <T> T await(CompletableFuture<T> awaitable) throws Exception {
         return stagingAreaContractProvider.await(awaitable);
     }
 

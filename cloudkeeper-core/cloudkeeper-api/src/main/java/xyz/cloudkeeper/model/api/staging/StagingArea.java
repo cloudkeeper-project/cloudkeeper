@@ -1,7 +1,5 @@
 package xyz.cloudkeeper.model.api.staging;
 
-import akka.japi.Option;
-import scala.concurrent.Future;
 import xyz.cloudkeeper.model.api.RuntimeContext;
 import xyz.cloudkeeper.model.immutable.element.Index;
 import xyz.cloudkeeper.model.runtime.element.serialization.RuntimeSerializationRoot;
@@ -9,6 +7,8 @@ import xyz.cloudkeeper.model.runtime.execution.RuntimeAnnotatedExecutionTrace;
 import xyz.cloudkeeper.model.runtime.execution.RuntimeExecutionTrace;
 
 import javax.annotation.Nullable;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * CloudKeeper staging area for storing input, output, and intermediate objects.
@@ -54,17 +54,17 @@ public interface StagingArea {
      * {@link RuntimeExecutionTrace#getFrames()} or {@link RuntimeExecutionTrace#getReference()} must be non-empty.
      * The prefix must not contain array indices.
      *
-     * <p>The returned future will be completed successfully if the given prefix does not match any entries.
+     * <p>The returned future will be completed normally also if the given prefix does not match any entries.
      *
      * @param prefix Execution trace prefix with non-empty call stack or non-empty value reference that does not contain
      *     array indices.
-     * @return Future completed with {@code prefix} on success and an {@link StagingException} on failure
-     *     (unless the {@link Throwable} is not an {@link Exception}).
+     * @return Future that will normally be completed once the operation has succeeded, or that will exceptionally be
+     *     completed with a {@link StagingException}.
      * @throws IllegalArgumentException if the argument does not satisfy the constraints described above
      * @throws xyz.cloudkeeper.model.runtime.execution.IllegalExecutionTraceException if the given execution trace
      *     is not valid relative to the absolute execution trace represented by this staging area
      */
-    Future<RuntimeExecutionTrace> delete(RuntimeExecutionTrace prefix);
+    CompletableFuture<Void> delete(RuntimeExecutionTrace prefix);
 
     /**
      * Writes the object for the given source execution trace also as object for the given target execution trace.
@@ -78,13 +78,13 @@ public interface StagingArea {
      *
      * @param source source execution trace, {@link RuntimeExecutionTrace#getReference()} must be non-empty
      * @param target target execution trace, {@link RuntimeExecutionTrace#getReference()} must be non-empty
-     * @return Future completed with {@code target} on success and an {@link StagingException} on failure
-     *     (unless the {@link Throwable} is not an {@link Exception}).
+     * @return Future that will normally be completed once the operation has succeeded, or that will exceptionally be
+     *     completed with a {@link StagingException}.
      * @throws IllegalArgumentException if the arguments do not satisfy the constraints described above
      * @throws xyz.cloudkeeper.model.runtime.execution.IllegalExecutionTraceException if any of the two given
      *     execution traces is not valid relative to the absolute execution trace represented by this staging area
      */
-    Future<RuntimeExecutionTrace> copy(RuntimeExecutionTrace source, RuntimeExecutionTrace target);
+    CompletableFuture<Void> copy(RuntimeExecutionTrace source, RuntimeExecutionTrace target);
 
     /**
      * Writes an object for the given execution trace.
@@ -94,7 +94,8 @@ public interface StagingArea {
      *
      * <p>A staging area may store objects in an arbitrary (but self-contained) way that allows later retrieval with
      * {@link #getObject(RuntimeExecutionTrace)}. For instance, a simple staging-area implementation might store objects
-     * in a map in memory, whereas another implementation might store objects by serializing them to the file system.
+     * in a map in memory, whereas another implementation might store objects by serializing them to the secondary
+     * storage.
      *
      * <p>If serialization is used, staging-area implementations are suggested to call
      * {@link RuntimeAnnotatedExecutionTrace#getSerializationDeclarations()} and then proceed with serialization as
@@ -103,14 +104,13 @@ public interface StagingArea {
      *
      * @param target target execution trace, {@link RuntimeExecutionTrace#getReference()} must be non-empty
      * @param object object that is to be written
-     *
-     * @return Future completed with {@code target} on success and a {@link StagingException} on failure
-     *     (unless the {@link Throwable} is not an {@link Exception}).
+     * @return Future that will normally be completed once the operation has succeeded, or that will exceptionally be
+     *     completed with a {@link StagingException}.
      * @throws IllegalArgumentException if the arguments do not satisfy the constraints described above
      * @throws xyz.cloudkeeper.model.runtime.execution.IllegalExecutionTraceException if the given execution trace
      *     is not valid relative to the absolute execution trace represented by this staging area
      */
-    Future<RuntimeExecutionTrace> putObject(RuntimeExecutionTrace target, Object object);
+    CompletableFuture<Void> putObject(RuntimeExecutionTrace target, Object object);
 
     /**
      * Writes an object, represented as serialization tree, for the given execution trace.
@@ -125,40 +125,38 @@ public interface StagingArea {
      *
      * @param target target execution trace, {@link RuntimeExecutionTrace#getReference()} must be non-empty
      * @param serializationTree serialization tree that is to be written
-     *
-     * @return Future completed with {@code target} on success and a {@link StagingException} on failure
-     *     (unless the {@link Throwable} is not an {@link Exception}).
+     * @return Future that will normally be completed once the operation has succeeded, or that will exceptionally be
+     *     completed with a {@link StagingException}.
      * @throws IllegalArgumentException if the arguments do not satisfy the constraints described above
      * @throws xyz.cloudkeeper.model.runtime.execution.IllegalExecutionTraceException if the given execution trace
      *     is not valid relative to the absolute execution trace represented by this staging area
      */
-    Future<RuntimeExecutionTrace> putSerializationTree(RuntimeExecutionTrace target,
+    CompletableFuture<Void> putSerializationTree(RuntimeExecutionTrace target,
         RuntimeSerializationRoot serializationTree);
 
     /**
      * Returns the object for the given execution trace.
      *
      * @param source source execution trace, {@link RuntimeExecutionTrace#getReference()} must be non-empty
-     * @return Future completed with object on success and an {@link StagingException} on failure
-     *     (unless the {@link Throwable} is not an {@link Exception}).
+     * @return Future that will normally be completed once the operation has succeeded, or that will exceptionally be
+     *     completed with a {@link StagingException}.
      * @throws IllegalArgumentException if the argument does not satisfy the constraints described above
      * @throws xyz.cloudkeeper.model.runtime.execution.IllegalExecutionTraceException if the given execution trace
      *     is not valid relative to the absolute execution trace represented by this staging area
      */
-    Future<Object> getObject(RuntimeExecutionTrace source);
+    CompletableFuture<Object> getObject(RuntimeExecutionTrace source);
 
     /**
      * Returns whether a value exists at an execution trace.
      *
      * @param source source execution trace, {@link RuntimeExecutionTrace#getReference()} must be non-empty
-     * @return Future completed with {@code true} (if a value exists) or {@code false} (if no value exists at the given
-     *     trace) on success and an {@link StagingException} on failure (unless the {@link Throwable} is
-     *     not an {@link Exception}).
+     * @return Future that will normally be completed once the operation has succeeded, or that will exceptionally be
+     *     completed with a {@link StagingException}.
      * @throws IllegalArgumentException if the argument does not satisfy the constraints described above
      * @throws xyz.cloudkeeper.model.runtime.execution.IllegalExecutionTraceException if the given execution trace
      *     is not valid relative to the absolute execution trace represented by this staging area
      */
-    Future<Boolean> exists(RuntimeExecutionTrace source);
+    CompletableFuture<Boolean> exists(RuntimeExecutionTrace source);
 
     /**
      * Returns the maximum index present at the given execution trace that is smaller than or equal to the given upper
@@ -167,13 +165,13 @@ public interface StagingArea {
      * @param trace relative execution trace, must be of type {@link RuntimeExecutionTrace.Type#CONTENT} and
      *     {@link RuntimeExecutionTrace#getReference()} must be empty
      * @param upperBound upper bound on the index that will be returned; may be null if there is no upper bound
-     * @return Future completed with the maximum index (or an empty {@link Option} if no index exists) on success and a
-     *     {@link StagingException} on failure (unless the {@link Throwable} is not an {@link Exception}).
+     * @return Future that will normally be completed once the operation has succeeded, or that will exceptionally be
+     *     completed with a {@link StagingException}.
      * @throws IllegalArgumentException if the arguments do not satisfy the constraints described above
      * @throws xyz.cloudkeeper.model.runtime.execution.IllegalExecutionTraceException if the given execution trace
      *     is not valid relative to the absolute execution trace represented by this staging area
      */
-    Future<Option<Index>> getMaximumIndex(RuntimeExecutionTrace trace, @Nullable Index upperBound);
+    CompletableFuture<Optional<Index>> getMaximumIndex(RuntimeExecutionTrace trace, @Nullable Index upperBound);
 
     /**
      * Returns a staging area for the given descendant execution trace.

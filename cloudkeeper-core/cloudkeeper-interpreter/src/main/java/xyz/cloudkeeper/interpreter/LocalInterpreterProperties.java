@@ -1,14 +1,14 @@
 package xyz.cloudkeeper.interpreter;
 
-import scala.concurrent.ExecutionContext;
+import scala.concurrent.ExecutionContextExecutor;
 import xyz.cloudkeeper.model.api.RuntimeContext;
 
-import javax.annotation.Nullable;
 import java.io.IOException;
 import java.io.NotSerializableException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.Objects;
+import javax.annotation.Nullable;
 
 /**
  * Local, JVM-specific, interpreter properties.
@@ -21,7 +21,7 @@ final class LocalInterpreterProperties extends InterpreterProperties {
 
     private final long executionId;
     private final RuntimeContext runtimeContext;
-    @Nullable private final ExecutionContext asyncTaskContext;
+    @Nullable private final ExecutionContextExecutor asyncTaskContext;
     private final InterpreterEventBus eventBus;
 
     /**
@@ -30,12 +30,13 @@ final class LocalInterpreterProperties extends InterpreterProperties {
      * @param machineIndependentProperties workflow-execution properties that are equal across machine boundaries
      * @param executionId id of this workflow execution
      * @param runtimeContext runtime context for this workflow execution
-     * @param asyncTaskContext the {@link ExecutionContext} that is to be used for scheduling asynchronous tasks (such
-     *     as futures), or {@code null} to indicate that {@code getContext().dispatcher()} should be used
+     * @param asyncTaskContext the {@link ExecutionContextExecutor} that is to be used for scheduling asynchronous tasks
+     *     (such as futures), or {@code null} to indicate that {@code getContext().dispatcher()} should be used
      * @param eventBus event bus that module-interpreter actors will publish events to
      */
     LocalInterpreterProperties(InterpreterProperties machineIndependentProperties, long executionId,
-            RuntimeContext runtimeContext, @Nullable ExecutionContext asyncTaskContext, InterpreterEventBus eventBus) {
+            RuntimeContext runtimeContext, @Nullable ExecutionContextExecutor asyncTaskContext,
+            InterpreterEventBus eventBus) {
         super(machineIndependentProperties);
         this.executionId = executionId;
         this.runtimeContext = Objects.requireNonNull(runtimeContext);
@@ -60,14 +61,14 @@ final class LocalInterpreterProperties extends InterpreterProperties {
     }
 
     /**
-     * Returns the {@link ExecutionContext} that is to be used for scheduling asynchronous tasks, or {@code null} to
-     * indicate that {@code getContext().dispatcher()} should be used.
+     * Returns the {@link ExecutionContextExecutor} that is to be used for scheduling asynchronous tasks, or
+     * {@code null} to indicate that {@code getContext().dispatcher()} should be used.
      *
      * <p>This property exists for testing purposes: It allows to schedule futures that are executed only when
      * explicitly triggered by the test code.
      */
     @Nullable
-    ExecutionContext getAsyncTaskContext() {
+    ExecutionContextExecutor getAsyncTaskContext() {
         return asyncTaskContext;
     }
 

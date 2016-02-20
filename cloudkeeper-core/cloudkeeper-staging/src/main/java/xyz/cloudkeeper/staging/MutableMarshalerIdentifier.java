@@ -19,8 +19,8 @@ import java.util.Objects;
  */
 @XmlType(propOrder = { "name", "bundleIdentifier" })
 public final class MutableMarshalerIdentifier {
-    private Name name;
-    private URI bundleIdentifier;
+    @Nullable private Name name;
+    @Nullable private URI bundleIdentifier;
 
     @Override
     public boolean equals(@Nullable Object otherObject) {
@@ -45,11 +45,12 @@ public final class MutableMarshalerIdentifier {
         return String.format("%s (%s)", name, bundleIdentifier);
     }
 
+    @Nullable
     public Name getName() {
         return name;
     }
 
-    public MutableMarshalerIdentifier setName(Name name) {
+    public MutableMarshalerIdentifier setName(@Nullable Name name) {
         this.name = name;
         return this;
     }
@@ -58,12 +59,13 @@ public final class MutableMarshalerIdentifier {
         return setName(Name.qualifiedName(name));
     }
 
+    @Nullable
     @XmlElement(name = "bundle-identifier")
     public URI getBundleIdentifier() {
         return bundleIdentifier;
     }
 
-    public MutableMarshalerIdentifier setBundleIdentifier(URI bundleIdentifier) {
+    public MutableMarshalerIdentifier setBundleIdentifier(@Nullable URI bundleIdentifier) {
         this.bundleIdentifier = bundleIdentifier;
         return this;
     }

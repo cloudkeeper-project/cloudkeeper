@@ -3,11 +3,9 @@ package xyz.cloudkeeper.interpreter;
 import akka.actor.ActorRef;
 import akka.actor.PoisonPill;
 import akka.actor.UntypedActor;
-import akka.dispatch.Mapper;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
 import akka.japi.Creator;
-import scala.concurrent.Future;
 import xyz.cloudkeeper.model.api.staging.StagingArea;
 import xyz.cloudkeeper.model.bare.element.module.BareInputModule;
 import xyz.cloudkeeper.model.immutable.element.SimpleName;
@@ -15,7 +13,6 @@ import xyz.cloudkeeper.model.immutable.execution.ExecutionTrace;
 import xyz.cloudkeeper.model.runtime.element.module.RuntimeInputModule;
 import xyz.cloudkeeper.model.runtime.element.module.RuntimeOutPort;
 import xyz.cloudkeeper.model.runtime.element.serialization.RuntimeSerializationRoot;
-import xyz.cloudkeeper.model.runtime.execution.RuntimeExecutionTrace;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
@@ -23,6 +20,7 @@ import java.io.NotSerializableException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Interpreter for input modules.
@@ -98,7 +96,7 @@ final class InputModuleInterpreterActor extends AbstractModuleInterpreterActor {
 
         @Nullable Object value = inputModule.getValue();
         String kind;
-        Future<RuntimeExecutionTrace> stagingFuture;
+        CompletableFuture<Void> stagingFuture;
         if (value != null) {
             kind = "value";
             stagingFuture = staging.putObject(target, value);
@@ -112,18 +110,8 @@ final class InputModuleInterpreterActor extends AbstractModuleInterpreterActor {
         // If all goes well, create a PoisonPill message and have it sent to this actor. This will stop this actor, as
         // its work is done.
         ActorRef parent = getContext().parent();
-        Future<RuntimeExecutionTrace> successFuture = stagingFuture.map(
-            new Mapper<RuntimeExecutionTrace, RuntimeExecutionTrace>() {
-                @Override
-                public RuntimeExecutionTrace apply(RuntimeExecutionTrace parameter) {
-                    parent.tell(
-                        new InterpreterInterface.SubmoduleOutPortHasSignal(getModuleId(), outPortId),
-                        getSelf()
-                    );
-                    return parameter;
-                }
-            },
-            getAsyncTaskContext()
+        CompletableFuture<Void> successFuture = stagingFuture.thenRun(
+            () -> parent.tell(new InterpreterInterface.SubmoduleOutPortHasSignal(getModuleId(), outPortId), getSelf())
         );
         awaitAsynchronousAction(successFuture, "writing %s to staging area", kind);
     }

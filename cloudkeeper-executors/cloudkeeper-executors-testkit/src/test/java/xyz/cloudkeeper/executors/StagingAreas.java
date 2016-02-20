@@ -1,6 +1,5 @@
 package xyz.cloudkeeper.executors;
 
-import scala.concurrent.ExecutionContext;
 import xyz.cloudkeeper.dsl.Module;
 import xyz.cloudkeeper.dsl.ModuleFactory;
 import xyz.cloudkeeper.filesystem.FileStagingArea;
@@ -24,6 +23,7 @@ import java.nio.file.Path;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.Executor;
 
 public final class StagingAreas {
     private StagingAreas() {
@@ -36,7 +36,7 @@ public final class StagingAreas {
         .build();
 
     public static <T extends Module<T>> RuntimeStateProvider runtimeStateProviderForDSLModule(Class<T> moduleClazz,
-            Path basePath, ExecutionContext executionContext) throws ClassNotFoundException, LinkerException {
+            Path basePath, Executor executor) throws ClassNotFoundException, LinkerException {
         ModuleFactory moduleFactory = ModuleFactory.getDefault();
         T module = moduleFactory.create(moduleClazz);
         BareBundle bundle = moduleFactory.createBundle(module);
@@ -45,7 +45,7 @@ public final class StagingAreas {
             ExecutionTrace.empty(), module, Collections.<BareOverride>emptyList(), repository, LINKER_OPTIONS);
         StagingArea stagingArea;
         try (RuntimeContext runtimeContext = new RuntimeContextImpl(repository)) {
-            stagingArea = new FileStagingArea.Builder(runtimeContext, absoluteTrace, basePath, executionContext)
+            stagingArea = new FileStagingArea.Builder(runtimeContext, absoluteTrace, basePath, executor)
                 .build();
             return RuntimeStateProvider.of(runtimeContext, stagingArea);
         } catch (IOException exception) {

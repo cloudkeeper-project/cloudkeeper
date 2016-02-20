@@ -6,7 +6,6 @@ import akka.actor.Props;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import scala.concurrent.Await;
-import scala.concurrent.ExecutionContext;
 import scala.concurrent.duration.Duration;
 import xyz.cloudkeeper.interpreter.AdministratorActorCreator;
 import xyz.cloudkeeper.interpreter.CloudKeeperEnvironmentBuilder;
@@ -26,6 +25,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class SingleVMCloudKeeper {
@@ -115,7 +115,7 @@ public final class SingleVMCloudKeeper {
                 actualActorSystem = ownsActorSystem
                     ? ActorSystem.create()
                     : actorSystem;
-                ExecutionContext executionContext = actualActorSystem.dispatcher();
+                Executor runnableExecutor = actualActorSystem.dispatcher();
 
                 ActorRef administrator = actualActorSystem.actorOf(
                     Props.create(AdministratorActorCreator.getInstance()), ADMINISTRATOR_NAME);
@@ -123,15 +123,15 @@ public final class SingleVMCloudKeeper {
                     Props.create(new MasterInterpreterActorCreator(firstExecutionId)), MASTER_INTERPRETER_NAME);
 
                 ModuleConnectorProvider moduleConnectorProvider
-                    = new PrefetchingModuleConnectorProvider(actualWorkspaceBasePath, executionContext);
+                    = new PrefetchingModuleConnectorProvider(actualWorkspaceBasePath);
                 SimpleModuleExecutor simpleModuleExecutor
-                    = new LocalSimpleModuleExecutor.Builder(executionContext, moduleConnectorProvider).build();
+                    = new LocalSimpleModuleExecutor.Builder(runnableExecutor, moduleConnectorProvider).build();
                 ActorRef executor = actualActorSystem.actorOf(
                     Props.create(new ExecutorActorCreator(simpleModuleExecutor)), EXECUTOR_NAME);
 
                 InstanceProvider actualInstanceProvider = instanceProvider;
                 if (actualInstanceProvider == null) {
-                    actualInstanceProvider = new SimpleInstanceProvider.Builder(executionContext).build();
+                    actualInstanceProvider = new SimpleInstanceProvider.Builder(runnableExecutor).build();
                 }
 
                 actualActorSystem.actorOf(

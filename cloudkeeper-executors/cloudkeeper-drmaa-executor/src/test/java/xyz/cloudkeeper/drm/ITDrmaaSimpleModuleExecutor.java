@@ -1,6 +1,5 @@
 package xyz.cloudkeeper.drm;
 
-import akka.dispatch.ExecutionContexts;
 import org.ggf.drmaa.DrmaaException;
 import org.ggf.drmaa.Session;
 import org.ggf.drmaa.SessionFactory;
@@ -9,9 +8,6 @@ import org.testng.SkipException;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-import scala.concurrent.Await;
-import scala.concurrent.ExecutionContext;
-import scala.concurrent.duration.Duration;
 import xyz.cloudkeeper.examples.modules.BinarySum;
 import xyz.cloudkeeper.executors.CommandProvider;
 import xyz.cloudkeeper.executors.DummyProcess;
@@ -62,12 +58,11 @@ import java.util.concurrent.TimeUnit;
  * </li></ul>
  */
 public class ITDrmaaSimpleModuleExecutor {
-    private static final Duration AWAIT_DURATION = Duration.create(30, TimeUnit.DAYS);
+    private static final long AWAIT_DURATION_MIN = 5;
 
     private Session drmaaSession;
     private Path tempDir;
     private DrmaaSimpleModuleExecutor drmaaExecutor;
-    private ExecutionContext executionContext;
     private ScheduledExecutorService executorService;
 
     @BeforeClass
@@ -79,14 +74,13 @@ public class ITDrmaaSimpleModuleExecutor {
         }
 
         executorService = Executors.newScheduledThreadPool(4);
-        executionContext = ExecutionContexts.fromExecutorService(executorService);
 
         drmaaSession = SessionFactory.getFactory().getSession();
         drmaaSession.init("");
 
         tempDir = Files.createTempDirectory(getClass().getSimpleName());
         drmaaExecutor = new DrmaaSimpleModuleExecutor.Builder(drmaaSession, tempDir, DummyCommandProvider.INSTANCE,
-                executionContext, executorService)
+                executorService, executorService)
             .build();
     }
 
@@ -112,12 +106,12 @@ public class ITDrmaaSimpleModuleExecutor {
     @Test
     public void testDrmaaSubmission() throws Exception {
         RuntimeStateProvider runtimeStateProvider
-            = StagingAreas.runtimeStateProviderForDSLModule(BinarySum.class, tempDir, executionContext);
-        SimpleModuleExecutorResult result = Await.result(
-            drmaaExecutor.submit(runtimeStateProvider, null),
-            AWAIT_DURATION
-        );
-        Assert.assertEquals(result.getExecutionException().get().getMessage(), DummyProcess.EXECUTION_EXCEPTION_MSG);
+            = StagingAreas.runtimeStateProviderForDSLModule(BinarySum.class, tempDir, executorService);
+        SimpleModuleExecutorResult result = drmaaExecutor
+            .submit(runtimeStateProvider)
+            .get(AWAIT_DURATION_MIN, TimeUnit.MINUTES);
+        Assert.assertNotNull(result.getExecutionException());
+        Assert.assertEquals(result.getExecutionException().getMessage(), DummyProcess.EXECUTION_EXCEPTION_MSG);
 
         // Wait just a little bit so that tearDown() and clean-up by the DRMAA executor do not interfere with their
         // cleaning.

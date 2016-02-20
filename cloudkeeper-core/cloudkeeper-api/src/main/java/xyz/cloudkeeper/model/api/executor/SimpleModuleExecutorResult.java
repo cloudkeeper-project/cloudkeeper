@@ -1,6 +1,5 @@
 package xyz.cloudkeeper.model.api.executor;
 
-import akka.japi.Option;
 import xyz.cloudkeeper.model.api.ExecutionException;
 import xyz.cloudkeeper.model.immutable.ParseException;
 import xyz.cloudkeeper.model.immutable.element.Name;
@@ -145,10 +144,15 @@ public final class SimpleModuleExecutorResult implements Serializable {
         return Objects.hash(executorName, exceptionString, properties);
     }
 
-    public Option<ExecutionException> getExecutionException() {
-        return exception == null
-            ? Option.<ExecutionException>none()
-            : Option.some(exception);
+    /**
+     * Returns the {@link ExecutionException} if the simple-module execution completed exceptionally, or {@code null} if
+     * it completed normally.
+     *
+     * @return the exception, if any
+     */
+    @Nullable
+    public ExecutionException getExecutionException() {
+        return exception;
     }
 
     /**
@@ -179,7 +183,6 @@ public final class SimpleModuleExecutorResult implements Serializable {
      * @param propertyName name of property that was passed to {@link Builder#addProperty(SimpleName, Object)}
      * @param <T> expected type of the value
      * @return the value or {@code null} if not present
-     * @throws NullPointerException if an argument is null
      * @throws IllegalArgumentException if the first argument is not one of the expected types ({@link Boolean},
      *     {@link Long}, {@link Double}, or {@link String})
      * @throws ParseException if a property with the given key is present but of unexpected type

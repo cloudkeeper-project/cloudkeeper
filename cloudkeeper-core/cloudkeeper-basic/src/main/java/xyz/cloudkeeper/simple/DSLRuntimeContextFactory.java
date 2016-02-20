@@ -1,9 +1,6 @@
 package xyz.cloudkeeper.simple;
 
-import akka.dispatch.Futures;
-import akka.dispatch.Mapper;
-import scala.concurrent.ExecutionContext;
-import scala.concurrent.Future;
+import net.florianschoppmann.java.futures.Futures;
 import xyz.cloudkeeper.dsl.Module;
 import xyz.cloudkeeper.dsl.ModuleFactory;
 import xyz.cloudkeeper.linker.Linker;
@@ -12,7 +9,6 @@ import xyz.cloudkeeper.model.LinkerException;
 import xyz.cloudkeeper.model.api.RuntimeContext;
 import xyz.cloudkeeper.model.api.RuntimeContextFactory;
 import xyz.cloudkeeper.model.api.RuntimeStateProvisionException;
-import xyz.cloudkeeper.model.api.util.ScalaFutures;
 import xyz.cloudkeeper.model.bare.element.BareBundle;
 import xyz.cloudkeeper.model.bare.element.module.BareModule;
 import xyz.cloudkeeper.model.bare.execution.BareExecutionTrace;
@@ -27,27 +23,30 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.Executor;
 
 public final class DSLRuntimeContextFactory implements RuntimeContextFactory {
     private final ClassLoader classLoader;
     private final ModuleFactory moduleFactory;
     private final DSLExecutableProvider executableProvider;
-    private final ExecutionContext executionContext;
+    private final Executor executor;
 
     private DSLRuntimeContextFactory(Builder builder) {
         classLoader = builder.classLoader;
         moduleFactory = builder.moduleFactory;
         executableProvider = new DSLExecutableProvider(moduleFactory);
-        executionContext = builder.executionContext;
+        executor = builder.executor;
     }
 
     public static final class Builder {
-        private final ExecutionContext executionContext;
+        private final Executor executor;
         private ClassLoader classLoader = SystemBundle.class.getClassLoader();
         private ModuleFactory moduleFactory = ModuleFactory.getDefault();
 
-        public Builder(ExecutionContext executionContext) {
-            this.executionContext = Objects.requireNonNull(executionContext);
+        public Builder(Executor executor) {
+            this.executor = Objects.requireNonNull(executor);
         }
 
         public Builder setClassLoader(ClassLoader classLoader) {
@@ -99,30 +98,34 @@ public final class DSLRuntimeContextFactory implements RuntimeContextFactory {
     }
 
     @Override
-    public Future<RuntimeContext> newRuntimeContext(List<URI> bundleIdentifiers) {
+    public CompletableFuture<RuntimeContext> newRuntimeContext(List<URI> bundleIdentifiers) {
         final String moduleClassName;
         try {
             moduleClassName = moduleClassName(bundleIdentifiers);
         } catch (RuntimeStateProvisionException exception) {
-            return Futures.failed(exception);
+            return Futures.completedExceptionally(exception);
         }
 
-        return Futures
-            .<RuntimeContext>future(() -> {
-                Class<?> moduleClass = moduleFactory.loadClass(Name.qualifiedName(moduleClassName));
-                Module<?> module = createModule(moduleClass);
-                BareBundle bundle = moduleFactory.createBundle(module);
-                LinkerOptions linkerOptions = new LinkerOptions.Builder()
-                    .setClassProvider(
-                        name -> Optional.of(Class.forName(name.getBinaryName().toString(), true, classLoader))
-                    )
-                    .setExecutableProvider(executableProvider)
-                    .build();
-                RuntimeRepository repository
-                    = Linker.createRepository(Collections.singletonList(bundle), linkerOptions);
-                return new RuntimeContextImpl(repository, classLoader);
-            }, executionContext)
-            .transform(ScalaFutures.identityMapper(), new ExceptionMapper(moduleClassName), executionContext);
+        CompletionStage<RuntimeContext> completionStage = Futures.supplyAsync(() -> {
+            Class<?> moduleClass = moduleFactory.loadClass(Name.qualifiedName(moduleClassName));
+            Module<?> module = createModule(moduleClass);
+            BareBundle bundle = moduleFactory.createBundle(module);
+            LinkerOptions linkerOptions = new LinkerOptions.Builder()
+                .setClassProvider(
+                    name -> Optional.of(Class.forName(name.getBinaryName().toString(), true, classLoader))
+                )
+                .setExecutableProvider(executableProvider)
+                .build();
+            RuntimeRepository repository
+                = Linker.createRepository(Collections.singletonList(bundle), linkerOptions);
+            return new RuntimeContextImpl(repository, classLoader);
+        }, executor);
+        return Futures.translateException(
+            completionStage,
+            throwable -> new RuntimeStateProvisionException(String.format(
+                "Failed to provide runtime context for DSL module '%s' and its dependencies.", moduleClassName
+            ), Futures.unwrapCompletionException(throwable))
+        );
     }
 
     private static final class RuntimeContextImpl implements RuntimeContext {
@@ -155,26 +158,6 @@ public final class DSLRuntimeContextFactory implements RuntimeContextFactory {
                 .build();
             return Linker.createAnnotatedExecutionTrace(absoluteTrace, bareModule, overrides, repository,
                 linkerOptions);
-        }
-    }
-
-    /**
-     * Implementation of functional interface that maps a {@link Throwable} instance to itself (if it is an
-     * {@link RuntimeStateProvisionException} or not an {@link Exception}) or to a new
-     * {@link RuntimeStateProvisionException} instance that wraps the exception.
-     */
-    private static final class ExceptionMapper extends Mapper<Throwable, Throwable> {
-        private final String moduleClassName;
-
-        private ExceptionMapper(String moduleClassName) {
-            this.moduleClassName = moduleClassName;
-        }
-
-        @Override
-        public Throwable apply(Throwable cause) {
-            return new RuntimeStateProvisionException(String.format(
-                "Failed to provide runtime context for DSL module '%s' and its dependencies.", moduleClassName
-            ), cause);
         }
     }
 }

@@ -1,7 +1,5 @@
 package xyz.cloudkeeper.interpreter;
 
-import akka.japi.Option;
-import scala.concurrent.Promise;
 import xyz.cloudkeeper.model.api.RuntimeContext;
 import xyz.cloudkeeper.model.api.WorkflowExecutionException;
 import xyz.cloudkeeper.model.api.staging.StagingArea;
@@ -10,6 +8,9 @@ import xyz.cloudkeeper.model.util.ImmutableList;
 import java.io.Serializable;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import javax.annotation.Nullable;
 
 /**
  * Message interface for {@link AdministratorActor}.
@@ -25,19 +26,23 @@ final class AdministratorActorInterface {
      * <p>This message is sent only locally, as the promises contained in this message cannot be completed in a
      * different JVM. Instead, the messenger actor listens to future messages (coming from possibly remote interpreter
      * actors) and completes the promises.
+     *
+     * <p>Note that while this message is of course thread-safe, it necessarily references mutable state (that is, the
+     * state that the administrator actor is supposed to manage).
      */
     static final class ManageExecution {
         private final long executionId;
         private final RuntimeContext runtimeContext;
         private final StagingArea stagingArea;
         private final boolean retrieveResults;
-        private final ImmutableList<Promise<Object>> outPortPromises;
-        private final Promise<Long> finishTimeMillisPromise;
-        private final Promise<Option<WorkflowExecutionException>> executionExceptionPromise;
+        private final ImmutableList<CompletableFuture<Object>> outPortPromises;
+        private final CompletableFuture<Long> finishTimeMillisPromise;
+        private final CompletableFuture<Optional<WorkflowExecutionException>> executionExceptionPromise;
 
         ManageExecution(long executionId, RuntimeContext runtimeContext, StagingArea stagingArea,
-                boolean retrieveResults, List<Promise<Object>> outPortPromises, Promise<Long> finishTimeMillisPromise,
-                Promise<Option<WorkflowExecutionException>> executionExceptionPromise) {
+                boolean retrieveResults, List<CompletableFuture<Object>> outPortPromises,
+                CompletableFuture<Long> finishTimeMillisPromise,
+                CompletableFuture<Optional<WorkflowExecutionException>> executionExceptionPromise) {
             this.executionId = executionId;
             this.runtimeContext = Objects.requireNonNull(runtimeContext);
             this.stagingArea = Objects.requireNonNull(stagingArea);
@@ -71,15 +76,15 @@ final class AdministratorActorInterface {
             return retrieveResults;
         }
 
-        List<Promise<Object>> getOutPortPromises() {
+        List<CompletableFuture<Object>> getOutPortPromises() {
             return outPortPromises;
         }
 
-        Promise<Long> getFinishTimeMillisPromise() {
+        CompletableFuture<Long> getFinishTimeMillisPromise() {
             return finishTimeMillisPromise;
         }
 
-        Promise<Option<WorkflowExecutionException>> getExecutionExceptionPromise() {
+        CompletableFuture<Optional<WorkflowExecutionException>> getExecutionExceptionPromise() {
             return executionExceptionPromise;
         }
     }
@@ -124,7 +129,7 @@ final class AdministratorActorInterface {
         private static final long serialVersionUID = -8895015652348672466L;
 
         private final long executionId;
-        private final InterpreterException exception;
+        @Nullable private final InterpreterException exception;
 
         /**
          * Constructor.
@@ -133,7 +138,7 @@ final class AdministratorActorInterface {
          * @param exception exception that caused the workflow execution to fail, or {@code null} if execution was
          *     successful
          */
-        ExecutionFinished(long executionId, InterpreterException exception) {
+        ExecutionFinished(long executionId, @Nullable InterpreterException exception) {
             this.executionId = executionId;
             this.exception = exception;
         }
@@ -149,6 +154,7 @@ final class AdministratorActorInterface {
             return executionId;
         }
 
+        @Nullable
         InterpreterException getException() {
             return exception;
         }

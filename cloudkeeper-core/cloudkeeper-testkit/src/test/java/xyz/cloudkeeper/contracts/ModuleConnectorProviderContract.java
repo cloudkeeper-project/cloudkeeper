@@ -3,9 +3,6 @@ package xyz.cloudkeeper.contracts;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-import scala.concurrent.Await;
-import scala.concurrent.Awaitable;
-import scala.concurrent.duration.FiniteDuration;
 import xyz.cloudkeeper.examples.modules.Fibonacci;
 import xyz.cloudkeeper.model.api.ConnectorException;
 import xyz.cloudkeeper.model.api.executor.ExtendedModuleConnector;
@@ -18,6 +15,8 @@ import xyz.cloudkeeper.model.immutable.execution.ExecutionTrace;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Contract test for module-connector provider.
@@ -28,17 +27,16 @@ import java.nio.file.Path;
 public final class ModuleConnectorProviderContract {
     private final ModuleConnectorProvider moduleConnectorProvider;
     private final StagingAreaContractProvider stagingAreaContractProvider;
-    private final FiniteDuration awaitDuration;
+    private final long awaitDurationMillis;
     private StagingAreaContractHelper helper;
     private StagingArea stagingArea;
     private ExtendedModuleConnector moduleConnector;
 
     public ModuleConnectorProviderContract(ModuleConnectorProvider moduleConnectorProvider,
-        StagingAreaContractProvider stagingAreaContractProvider, FiniteDuration awaitDuration) {
-
+            StagingAreaContractProvider stagingAreaContractProvider, long awaitDurationMillis) {
         this.moduleConnectorProvider = moduleConnectorProvider;
         this.stagingAreaContractProvider = stagingAreaContractProvider;
-        this.awaitDuration = awaitDuration;
+        this.awaitDurationMillis = awaitDurationMillis;
     }
 
     @BeforeClass
@@ -46,8 +44,8 @@ public final class ModuleConnectorProviderContract {
         helper = new StagingAreaContractHelper(stagingAreaContractProvider, Fibonacci.class);
     }
 
-    private <T> T await(Awaitable<T> awaitable) throws Exception {
-        return Await.result(awaitable, awaitDuration);
+    private <T> T await(CompletableFuture<T> future) throws Exception {
+        return future.get(awaitDurationMillis, TimeUnit.MILLISECONDS);
     }
 
     @Test

@@ -1,17 +1,18 @@
 package xyz.cloudkeeper.interpreter;
 
 import akka.actor.UntypedActor;
-import akka.dispatch.OnComplete;
+import net.florianschoppmann.java.futures.Futures;
 import scala.concurrent.ExecutionContext;
-import scala.concurrent.Future;
+import scala.concurrent.ExecutionContextExecutor;
 
-import javax.annotation.Nullable;
 import java.util.IdentityHashMap;
 import java.util.Objects;
+import java.util.concurrent.CompletionStage;
+import javax.annotation.Nullable;
 
 abstract class AbstractActor extends UntypedActor {
     private final IdentityHashMap<Object, AsynchronousAction> pendingActions = new IdentityHashMap<>();
-    private final ExecutionContext asyncTaskContext;
+    private final ExecutionContextExecutor asyncTaskContext;
 
     /**
      * Constructor.
@@ -19,7 +20,7 @@ abstract class AbstractActor extends UntypedActor {
      * @param asyncTaskContext the {@link ExecutionContext} that is to be used for scheduling asynchronous tasks (such
      *     as futures), or {@code null} to indicate that {@code getContext().dispatcher()} should be used
      */
-    AbstractActor(@Nullable ExecutionContext asyncTaskContext) {
+    AbstractActor(@Nullable ExecutionContextExecutor asyncTaskContext) {
         this.asyncTaskContext = asyncTaskContext == null
             ? getContext().dispatcher()
             : asyncTaskContext;
@@ -31,7 +32,7 @@ abstract class AbstractActor extends UntypedActor {
      * <p>During testing, this may be different from the message dispatcher returned by
      * {@link akka.actor.UntypedActorContext#dispatcher()} (accessible through {@link #getContext()}.
      */
-    final ExecutionContext getAsyncTaskContext() {
+    final ExecutionContextExecutor getAsyncTaskContext() {
         return asyncTaskContext;
     }
 
@@ -65,58 +66,60 @@ abstract class AbstractActor extends UntypedActor {
         return action;
     }
 
-    private <T> void createAsynchronousActionForFuture(Future<T> future, final boolean pipeResultToSelf,
+    private <T> void createAsynchronousActionForFuture(CompletionStage<T> completionStage, boolean pipeResultToSelf,
             String description, Object... args) {
-        final AsynchronousAction action = createAsynchronousAction(future, description, args);
-        future.onComplete(new OnComplete<T>() {
-            @Override
-            public void onComplete(@Nullable Throwable throwable, @Nullable T result) {
-                getSelf().tell(action, getSelf());
-                if (throwable != null) {
-                    getSelf().tell(new AsynchronousActionFailed(action, throwable), getSelf());
-                } else if (pipeResultToSelf) {
-                    getSelf().tell(result, getSelf());
-                }
+        AsynchronousAction action = createAsynchronousAction(completionStage, description, args);
+        completionStage.whenCompleteAsync((result, throwable) -> {
+            getSelf().tell(action, getSelf());
+            if (throwable != null) {
+                getSelf().tell(
+                    new AsynchronousActionFailed(action, Futures.unwrapCompletionException(throwable)),
+                    getSelf()
+                );
+            } else if (pipeResultToSelf) {
+                getSelf().tell(result, getSelf());
             }
         }, asyncTaskContext);
     }
 
     /**
-     * Adds a completion handler to the given future, which sends the result to this actor. In case the future is
+     * Adds a completion handler to the completion stage, which sends the result to this actor. In case the stage is
      * completed exceptionally, fails the current actor with the given description.
      *
-     * <p>This method also adds a new {@link AsynchronousAction} to {@link #pendingActions} with {@code future} as key.
-     * This asynchronous action is automatically removed from the map after the futures is completed. At that time,
-     * {@link #checkIfNoAsynchronousActions} is automatically called.
+     * <p>This method also adds a new {@link AsynchronousAction} to {@link #pendingActions} with {@code completionStage}
+     * as key. This asynchronous action is automatically removed from the map after the completion stage is completed.
+     * At that time, {@link #checkIfNoAsynchronousActions} is automatically called.
      *
-     * @param future future to that a completion handler will be added
+     * @param completionStage Completion stage to that a completion handler will be added. If completed exceptionally,
+     *     method {@link #asynchronousActionFailed(String, Throwable)} will be triggered asynchronously.
      * @param description Description of this asynchronous action. The string should be a reduced gerund clause that
      *     could extend "while ...". There should be no period(.) at the end. For instance, "cleaning intermediate
      *     files".
      * @param args arguments referenced by the format specifiers in the format string
      */
-    final void pipeResultToSelf(Future<?> future, String description, Object... args) {
-        createAsynchronousActionForFuture(future, true, description, args);
+    final void pipeResultToSelf(CompletionStage<?> completionStage, String description, Object... args) {
+        createAsynchronousActionForFuture(completionStage, true, description, args);
     }
 
     /**
-     * Registers a completion handler to the given future. In case the future is completed exceptionally, fails the
-     * current actor with the given description.
+     * Registers a completion handler for the given completion stage. In case the stage is completed exceptionally,
+     * fails the current actor with the given description.
      *
-     * <p>This method also adds a new {@link AsynchronousAction} to {@link #pendingActions} with {@code future} as key.
-     * This asynchronous action is automatically removed from the map after the futures is completed. At that time,
-     * {@link #checkIfNoAsynchronousActions} is automatically called.
+     * <p>This method also adds a new {@link AsynchronousAction} to {@link #pendingActions} with {@code completionStage}
+     * as key. This asynchronous action is automatically removed from the map after the stage is completed. At that
+     * time, {@link #checkIfNoAsynchronousActions} is automatically called.
      *
      * <p>Unlike {@link #pipeResultToSelf}, this method does not cause any messages to be sent to this actor.
      *
-     * @param future future to that a completion handler will be added
+     * @param completionStage Completion stage to that a completion handler will be added. If completed exceptionally,
+     *     method {@link #asynchronousActionFailed(String, Throwable)} will be triggered asynchronously.
      * @param description Description of this asynchronous action. The string should be a reduced gerund clause that
      *     could extend "while ...". There should be no period(.) at the end. For instance, "cleaning intermediate
      *     files".
      * @param args arguments referenced by the format specifiers in the format string
      */
-    final void awaitAsynchronousAction(Future<?> future, String description, Object... args) {
-        createAsynchronousActionForFuture(future, false, description, args);
+    final void awaitAsynchronousAction(CompletionStage<?> completionStage, String description, Object... args) {
+        createAsynchronousActionForFuture(completionStage, false, description, args);
     }
 
     /**
@@ -144,7 +147,7 @@ abstract class AbstractActor extends UntypedActor {
      */
     final void endAsynchronousAction(Object key) {
         Objects.requireNonNull(key);
-        AsynchronousAction removedValue = pendingActions.remove(key);
+        @Nullable AsynchronousAction removedValue = pendingActions.remove(key);
 
         if (removedValue == null) {
             throw new IllegalStateException(String.format(
@@ -167,7 +170,9 @@ abstract class AbstractActor extends UntypedActor {
      * given message and the given cause.
      *
      * @param message high-level message explaining the failure, including what the asynchronous action was about
-     * @param cause the failure that caused the asynchronous action to fail
+     * @param cause The failure that caused the asynchronous action to fail. This will not be a
+     *     {@link java.util.concurrent.CompletionException} with cause, as this would have been unwrapped at send time
+     *     (see {@link #createAsynchronousActionForFuture(CompletionStage, boolean, String, Object...)}).
      */
     protected abstract void asynchronousActionFailed(String message, Throwable cause)
         throws InterpreterException;

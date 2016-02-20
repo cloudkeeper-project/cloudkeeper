@@ -1,7 +1,5 @@
 package xyz.cloudkeeper.examples.repositories;
 
-import akka.dispatch.Futures;
-import scala.concurrent.Future;
 import xyz.cloudkeeper.linker.Linker;
 import xyz.cloudkeeper.linker.LinkerOptions;
 import xyz.cloudkeeper.model.LinkerException;
@@ -14,6 +12,7 @@ import xyz.cloudkeeper.model.bare.execution.BareExecutionTrace;
 import xyz.cloudkeeper.model.bare.execution.BareOverride;
 import xyz.cloudkeeper.model.runtime.element.RuntimeRepository;
 import xyz.cloudkeeper.model.runtime.execution.RuntimeAnnotatedExecutionTrace;
+import net.florianschoppmann.java.futures.Futures;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
@@ -24,6 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
 public final class TestKitRuntimeContextFactory implements RuntimeContextFactory {
     private static final String TESTKIT_SCHEME = "x-testkit";
@@ -33,13 +33,13 @@ public final class TestKitRuntimeContextFactory implements RuntimeContextFactory
     }
 
     @Override
-    public Future<RuntimeContext> newRuntimeContext(List<URI> bundleIdentifiers) {
+    public CompletableFuture<RuntimeContext> newRuntimeContext(List<URI> bundleIdentifiers) {
         Objects.requireNonNull(bundleIdentifiers);
 
         List<BareBundle> bundles = new ArrayList<>(bundleIdentifiers.size());
         for (URI bundleIdentifier: bundleIdentifiers) {
             if (!TESTKIT_SCHEME.equals(bundleIdentifier.getScheme())) {
-                return Futures.failed(new RuntimeStateProvisionException(String.format(
+                return Futures.completedExceptionally(new RuntimeStateProvisionException(String.format(
                     "Expected list of bundle identifiers (URI) with scheme '%s', but list contains '%s'.",
                     TESTKIT_SCHEME, bundleIdentifier
                 )));
@@ -47,7 +47,7 @@ public final class TestKitRuntimeContextFactory implements RuntimeContextFactory
 
             @Nullable final String providerClassName = bundleIdentifier.getSchemeSpecificPart();
             if (providerClassName == null || providerClassName.isEmpty()) {
-                return Futures.failed(new RuntimeStateProvisionException(String.format(
+                return Futures.completedExceptionally(new RuntimeStateProvisionException(String.format(
                     "Expected bundle identifier (URI) that contains a class name in the schema-specific part, but "
                         + "bundle identifier is '%s'.", bundleIdentifier
                 )));
@@ -56,7 +56,7 @@ public final class TestKitRuntimeContextFactory implements RuntimeContextFactory
             try {
                 Class<?> providerClass = Class.forName(providerClassName);
                 if (!TestKitBundleProvider.class.isAssignableFrom(providerClass)) {
-                    return Futures.failed(new RuntimeStateProvisionException(String.format(
+                    return Futures.completedExceptionally(new RuntimeStateProvisionException(String.format(
                         "Expected bundle identifier (URI) that contains the name of a class implementing %s, but got "
                             + "'%s'.",
                         TestKitBundleProvider.class, bundleIdentifier
@@ -67,7 +67,7 @@ public final class TestKitRuntimeContextFactory implements RuntimeContextFactory
                 bundles.add(testKitBundleProvider.get());
             } catch (ClassNotFoundException | NoSuchMethodException | InstantiationException | IllegalAccessException
                     | InvocationTargetException exception) {
-                return Futures.failed(
+                return Futures.completedExceptionally(
                     new RuntimeStateProvisionException(String.format(
                         "Could not instantiate class %s.", providerClassName
                     ), exception)
@@ -81,9 +81,9 @@ public final class TestKitRuntimeContextFactory implements RuntimeContextFactory
             .build();
         try {
             RuntimeRepository repository = Linker.createRepository(bundles, linkerOptions);
-            return Futures.successful(new RuntimeContextImpl(repository, linkerOptions));
+            return CompletableFuture.completedFuture(new RuntimeContextImpl(repository, linkerOptions));
         } catch (LinkerException exception) {
-            return Futures.failed(exception);
+            return Futures.completedExceptionally(exception);
         }
     }
 

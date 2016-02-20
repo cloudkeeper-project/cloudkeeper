@@ -25,7 +25,6 @@
         <dependency>
             <groupId>net.florianschoppmann.java</groupId>
             <artifactId>java-types</artifactId>
-            <version>${types.version}</version>
         </dependency>
 
         <dependency>

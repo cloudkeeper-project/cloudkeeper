@@ -1,16 +1,11 @@
 package xyz.cloudkeeper.model.api;
 
-import akka.dispatch.Futures;
-import akka.dispatch.Mapper;
-import scala.concurrent.ExecutionContext;
-import scala.concurrent.Future;
+import net.florianschoppmann.java.futures.Futures;
 import xyz.cloudkeeper.model.LinkerException;
 import xyz.cloudkeeper.model.api.staging.InstanceProvider;
 import xyz.cloudkeeper.model.api.staging.InstanceProvisionException;
 import xyz.cloudkeeper.model.api.staging.StagingArea;
 import xyz.cloudkeeper.model.api.staging.StagingAreaProvider;
-import xyz.cloudkeeper.model.api.util.ScalaFutures;
-import xyz.cloudkeeper.model.api.util.ThrowingFunction;
 import xyz.cloudkeeper.model.bare.element.module.BareModule;
 import xyz.cloudkeeper.model.bare.execution.BareExecutionTrace;
 import xyz.cloudkeeper.model.bare.execution.BareOverride;
@@ -28,6 +23,8 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
 
 /**
@@ -104,59 +101,23 @@ public abstract class RuntimeStateProvider implements Serializable {
     public abstract ExecutionTrace getExecutionTrace();
 
     /**
-     * Returns a future that will be completed with the result of the future obtained from applying the given function
-     * to the runtime context provided by this instance.
-     *
-     * <p>This method ensures that the runtime context passed to {@code function} is properly closed, even if an
-     * exception occurs at any stage. This method may thus regarded as an asynchronous try-with-resources
-     * implementation (with just one resource: the runtime context).
-     *
-     * @param instanceProvider instance provider
-     * @param function function returning a new future that will provide the result of the returned future
-     * @param executionContext execution context used for executing asynchronous tasks
-     * @param <R> the type of the returned future
-     * @return the future
-     */
-    public <R> Future<R> flatMapRuntimeContext(InstanceProvider instanceProvider,
-            ThrowingFunction<RuntimeContext, Future<R>, Exception> function, ExecutionContext executionContext) {
-        return ScalaFutures.flatMapWithResource(provideRuntimeContext(instanceProvider), function, executionContext);
-    }
-
-    /**
-     * Returns a future that will be completed with the result of the given function when applied to the runtime context
-     * provided by this instance.
-     *
-     * <p>This method ensures that the runtime context passed to {@code function} is properly closed, even if an
-     * exception occurs at any stage. This method may thus regarded as an asynchronous try-with-resources
-     * implementation (with just one resource: the runtime context).
-     *
-     * @param instanceProvider instance provider
-     * @param function function returning the result of the returned future
-     * @param executionContext execution context used for executing asynchronous tasks
-     * @param <R> the type of the returned future
-     * @return the future
-     */
-    public <R> Future<R> mapRuntimeContext(InstanceProvider instanceProvider,
-            ThrowingFunction<RuntimeContext, R, Exception> function, ExecutionContext executionContext) {
-        return ScalaFutures.mapWithResource(provideRuntimeContext(instanceProvider), function, executionContext);
-    }
-
-    /**
      * Returns the runtime context, given a runtime-context provider.
      *
-     * <p>While this method is similar to
-     * {@link RuntimeContextFactory#newRuntimeContext(List)}, this method may provide additional caching. That is, the
-     * returned runtime context is not necessarily a fresh instance.
+     * <p>If this runtime state was created using {@link #of(RuntimeContext, StagingArea)}, then the returned future
+     * will already be completed with only a lightweight wrapper around the original {@link RuntimeContext}. This
+     * lightweight wrapper will not forward calls to {@link RuntimeContext#close()}.
      *
-     * <p>Callers are <em>always</em> expected to call {@link RuntimeContext#close()} on the runtime context that the
+     * <p>Nonetheless, callers should not make assumptions on how this runtime state was created (using
+     * {@link #of(RuntimeContext, StagingArea)} or by means of deserialization, see class-level documentation). Hence,
+     * callers are <em>always</em> expected to eventually call {@link RuntimeContext#close()} on the instance that the
      * returned future will be completed with.
      *
      * @param instanceProvider instance provider that can provide (at least) a {@link RuntimeContextFactory} and
-     *     {@link ExecutionContext} instance
-     * @return future that will be completed with the runtime context on success or a
-     *     {@link RuntimeStateProvisionException} on failure
+     *     {@link Executor} instance
+     * @return future that will normally be completed with the runtime context, or exceptionally with a
+     *     {@link RuntimeStateProvisionException}
      */
-    public abstract Future<RuntimeContext> provideRuntimeContext(InstanceProvider instanceProvider);
+    public abstract CompletableFuture<RuntimeContext> provideRuntimeContext(InstanceProvider instanceProvider);
 
     final void requireValidRuntimeContext(RuntimeContext runtimeContext) {
         if (!(runtimeContext instanceof RuntimeContextImpl)
@@ -189,7 +150,7 @@ public abstract class RuntimeStateProvider implements Serializable {
      *
      * <p>While this method is similar to
      * {@link StagingAreaProvider#provideStaging(RuntimeContext, RuntimeAnnotatedExecutionTrace, InstanceProvider)},
-     * this method may provide additional caching. That is, the returned execution trace is not necessarily a fresh
+     * this method may provide additional caching. That is, the returned staging area is not necessarily a fresh
      * instance.
      *
      * <p>Note that this method provides no guarantees that the execution trace of the returned staging area
@@ -231,8 +192,8 @@ public abstract class RuntimeStateProvider implements Serializable {
         }
 
         @Override
-        public Future<RuntimeContext> provideRuntimeContext(InstanceProvider instanceProvider) {
-            return Futures.successful(new RuntimeContextImpl(this, runtimeContext, true));
+        public CompletableFuture<RuntimeContext> provideRuntimeContext(InstanceProvider instanceProvider) {
+            return CompletableFuture.completedFuture(new RuntimeContextImpl(this, runtimeContext, true));
         }
 
         @Override
@@ -277,24 +238,19 @@ public abstract class RuntimeStateProvider implements Serializable {
         }
 
         @Override
-        public Future<RuntimeContext> provideRuntimeContext(InstanceProvider instanceProvider) {
+        public CompletableFuture<RuntimeContext> provideRuntimeContext(InstanceProvider instanceProvider) {
             RuntimeContextFactory runtimeContextFactory;
-            ExecutionContext executionContext;
             try {
                 runtimeContextFactory = instanceProvider.getInstance(RuntimeContextFactory.class);
-                executionContext = instanceProvider.getInstance(ExecutionContext.class);
             } catch (InstanceProvisionException exception) {
-                return Futures.failed(exception);
+                return Futures.completedExceptionally(exception);
             }
 
-            return runtimeContextFactory
-                .newRuntimeContext(bundleIdentifiers)
-                .map(new Mapper<RuntimeContext, RuntimeContext>() {
-                    @Override
-                    public RuntimeContext apply(RuntimeContext runtimeContext) {
-                        return new RuntimeContextImpl(DescriptorBacked.this, runtimeContext, false);
-                    }
-                }, executionContext);
+            return Futures.unwrapCompletionException(
+                runtimeContextFactory
+                    .newRuntimeContext(bundleIdentifiers)
+                    .thenApply(runtimeContext -> new RuntimeContextImpl(this, runtimeContext, false))
+            );
         }
 
         @Override

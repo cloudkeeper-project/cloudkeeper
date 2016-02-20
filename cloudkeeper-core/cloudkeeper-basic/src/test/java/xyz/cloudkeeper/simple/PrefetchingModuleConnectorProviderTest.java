@@ -1,25 +1,24 @@
 package xyz.cloudkeeper.simple;
 
-import akka.dispatch.ExecutionContexts;
 import org.testng.annotations.AfterSuite;
 import org.testng.annotations.Factory;
-import scala.concurrent.duration.Duration;
-import scala.concurrent.duration.FiniteDuration;
 import xyz.cloudkeeper.contracts.ModuleConnectorProviderContract;
 import xyz.cloudkeeper.model.api.executor.ModuleConnectorProvider;
 import xyz.cloudkeeper.model.api.util.RecursiveDeleteVisitor;
 import xyz.cloudkeeper.staging.MapStagingArea;
 
+import javax.annotation.Nullable;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 public class PrefetchingModuleConnectorProviderTest {
-    private Path tempDir;
-    private ExecutorService executorService;
+    private static final long WAIT_DURATION_MILLIS = 1000;
+
+    @Nullable private Path tempDir;
+    @Nullable private ExecutorService executorService;
 
     public void setup() throws IOException {
         tempDir = Files.createTempDirectory(getClass().getSimpleName());
@@ -28,6 +27,7 @@ public class PrefetchingModuleConnectorProviderTest {
 
     @AfterSuite
     public void tearDown() throws IOException {
+        assert tempDir != null && executorService != null;
         Files.walkFileTree(tempDir, RecursiveDeleteVisitor.getInstance());
         executorService.shutdownNow();
     }
@@ -35,17 +35,14 @@ public class PrefetchingModuleConnectorProviderTest {
     @Factory
     public Object[] contractTests() throws IOException {
         setup();
+        assert tempDir != null && executorService != null;
 
-        ModuleConnectorProvider moduleConnectorProvider = new PrefetchingModuleConnectorProvider(
-            tempDir,
-            ExecutionContexts.fromExecutorService(executorService)
-        );
-        FiniteDuration awaitDuration = Duration.create(1, TimeUnit.SECONDS);
+        ModuleConnectorProvider moduleConnectorProvider = new PrefetchingModuleConnectorProvider(tempDir);
         return new Object[] {
             new ModuleConnectorProviderContract(
                 moduleConnectorProvider,
                 (identifier, runtimeContext, executionTrace) -> new MapStagingArea(runtimeContext, executionTrace),
-                awaitDuration
+                WAIT_DURATION_MILLIS
             )
         };
     }

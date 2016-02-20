@@ -1,10 +1,11 @@
 package xyz.cloudkeeper.contracts;
 
 import org.testng.Assert;
-import scala.concurrent.Future;
 import xyz.cloudkeeper.model.api.RuntimeContext;
 import xyz.cloudkeeper.model.api.staging.StagingArea;
 import xyz.cloudkeeper.model.runtime.execution.RuntimeAnnotatedExecutionTrace;
+
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Provider for {@link StagingArea} instances in contract tests.
@@ -35,15 +36,15 @@ public interface StagingAreaContractProvider {
         RuntimeAnnotatedExecutionTrace executionTrace);
 
     /**
-     * Awaits the result of the given {@link Future}.
+     * Awaits the result of the given {@link CompletableFuture}.
      *
-     * @param future {@link Future} returned by a {@link StagingArea} instance previously returned by
+     * @param future {@link CompletableFuture} returned by a {@link StagingArea} instance previously returned by
      *     {@link #getStagingArea(String, RuntimeContext, RuntimeAnnotatedExecutionTrace)}
      * @param <T> type of the future
      * @return result of the given future
      */
-    default <T> T await(Future<T> future) throws Exception {
-        Assert.assertTrue(future.isCompleted(), "Future has not yet been completed.");
-        return future.value().get().get();
+    default <T> T await(CompletableFuture<T> future) throws Exception {
+        Assert.assertTrue(future.isDone(), "Future has not yet been completed.");
+        return future.get();
     }
 }

@@ -1,6 +1,5 @@
 package xyz.cloudkeeper.maven;
 
-import akka.dispatch.ExecutionContexts;
 import org.eclipse.aether.RepositoryException;
 import org.eclipse.aether.artifact.Artifact;
 import org.eclipse.aether.artifact.DefaultArtifact;
@@ -9,9 +8,6 @@ import org.testng.Assert;
 import org.testng.annotations.AfterSuite;
 import org.testng.annotations.Factory;
 import org.testng.annotations.Test;
-import scala.concurrent.Await;
-import scala.concurrent.ExecutionContext;
-import scala.concurrent.duration.Duration;
 import xyz.cloudkeeper.contracts.RuntimeContextProviderContract;
 import xyz.cloudkeeper.examples.modules.BinarySum;
 import xyz.cloudkeeper.examples.modules.Decrease;
@@ -45,15 +41,15 @@ import java.util.stream.Collectors;
  * "cloudkeeper-maven-plugin".
  */
 public class ITMavenRuntimeContextProvider {
+    private static final long TIMEOUT_MILLIS = 10_000;
+
     private ExecutorService executorService;
-    private ExecutionContext executionContext;
     private Path tempDir;
     private DummyAetherRepository aetherRepository;
     private boolean classLoaderVerified = false;
 
     public void setup() throws Exception {
         executorService = Executors.newFixedThreadPool(1);
-        executionContext = ExecutionContexts.fromExecutor(executorService);
         tempDir = Files.createTempDirectory(getClass().getSimpleName());
         aetherRepository = new DummyAetherRepository(tempDir);
         aetherRepository.installBundle("decrease", Collections.singletonList(Decrease.class));
@@ -74,7 +70,7 @@ public class ITMavenRuntimeContextProvider {
         return new Object[] {
             new RuntimeContextProviderContract(
                 () -> new MavenRuntimeContextFactory.Builder(
-                    executionContext,
+                    executorService,
                     aetherRepository.getRepositorySystem(),
                     aetherRepository.getRepositorySystemSession()
                 ).build()
@@ -85,7 +81,7 @@ public class ITMavenRuntimeContextProvider {
     @Test
     public void provide() throws Exception {
         MavenRuntimeContextFactory runtimeContextFactory = new MavenRuntimeContextFactory.Builder(
-                executionContext,
+                executorService,
                 aetherRepository.getRepositorySystem(),
                 aetherRepository.getRepositorySystemSession()
             )
@@ -93,16 +89,13 @@ public class ITMavenRuntimeContextProvider {
             .build();
 
         try (
-            RuntimeContext runtimeContext = Await.result(
-                runtimeContextFactory.newRuntimeContext(
-                    Collections.singletonList(
-                        Bundles.bundleIdentifierFromMaven(
-                            DummyAetherRepository.GROUP_ID, "fibonacci", DummyAetherRepository.VERSION
-                        )
-                    )
-                ),
-                Duration.create(1, TimeUnit.DAYS)
-            )
+            RuntimeContext runtimeContext
+                = runtimeContextFactory.newRuntimeContext(
+                    Collections.singletonList(Bundles.bundleIdentifierFromMaven(
+                        DummyAetherRepository.GROUP_ID, "fibonacci", DummyAetherRepository.VERSION
+                    ))
+                )
+                .get(TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)
         ) {
             Assert.assertEquals(runtimeContext.getRepository().getBundles().size(), 3);
         }

@@ -1,8 +1,6 @@
 package xyz.cloudkeeper.filesystem;
 
-import akka.japi.Option;
 import cloudkeeper.types.ByteSequence;
-import scala.concurrent.ExecutionContext;
 import xyz.cloudkeeper.model.api.MarshalContext;
 import xyz.cloudkeeper.model.api.RuntimeContext;
 import xyz.cloudkeeper.model.api.staging.StagingAreaProvider;
@@ -37,6 +35,8 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.concurrent.Executor;
 
 /**
  * File-based staging area.
@@ -61,9 +61,9 @@ public final class FileStagingArea extends ExternalStagingArea {
     private final ImmutableList<Path> hardLinkEnabledPaths;
 
     private FileStagingArea(RuntimeAnnotatedExecutionTrace executionTrace, RuntimeContext runtimeContext,
-            ExecutionContext executionContext, Object monitor, JAXBContext jaxbContext, Path basePath,
+            Executor executor, Object monitor, JAXBContext jaxbContext, Path basePath,
             ImmutableList<Path> hardLinkEnabledPaths) {
-        super(executionTrace, runtimeContext, executionContext);
+        super(executionTrace, runtimeContext, executor);
         this.monitor = monitor;
         this.jaxbContext = jaxbContext;
         this.basePath = basePath;
@@ -218,7 +218,7 @@ public final class FileStagingArea extends ExternalStagingArea {
     }
 
     @Override
-    protected Option<Index> getMaximumIndex(RuntimeExecutionTrace trace, RuntimeAnnotatedExecutionTrace absoluteTrace,
+    protected Optional<Index> getMaximumIndex(RuntimeExecutionTrace trace, RuntimeAnnotatedExecutionTrace absoluteTrace,
             @Nullable Index upperBound) throws IOException {
         int upperBoundInt = upperBound == null
             ? Integer.MAX_VALUE
@@ -240,14 +240,14 @@ public final class FileStagingArea extends ExternalStagingArea {
             }
         }
         return maximumIndex >= 0
-            ? Option.some(Index.index(maximumIndex))
-            : Option.<Index>none();
+            ? Optional.of(Index.index(maximumIndex))
+            : Optional.empty();
     }
 
     @Override
     protected FileStagingArea resolveDescendant(RuntimeExecutionTrace trace,
             RuntimeAnnotatedExecutionTrace absoluteTrace) {
-        return new FileStagingArea(absoluteTrace, getRuntimeContext(), getExecutionContext(), monitor,
+        return new FileStagingArea(absoluteTrace, getRuntimeContext(), getExecutor(), monitor,
             jaxbContext, toPath(trace), hardLinkEnabledPaths);
     }
 
@@ -400,7 +400,7 @@ public final class FileStagingArea extends ExternalStagingArea {
         private final RuntimeAnnotatedExecutionTrace absoluteTrace;
         private final Path basePath;
         private final RuntimeContext runtimeContext;
-        private final ExecutionContext executionContext;
+        private final Executor executor;
         private ImmutableList<Path> hardLinkEnabledPaths = ImmutableList.of();
 
         /**
@@ -409,14 +409,14 @@ public final class FileStagingArea extends ExternalStagingArea {
          * @param runtimeContext runtime context including the CloudKeeper repository and the Java class loader
          * @param executionTrace the absolute execution trace that will correspond to the base path of this staging area
          * @param basePath base path of the new staging area in the file system
-         * @param executionContext execution context that file-system tasks will be submitted to
+         * @param executor executor that file-system tasks will be submitted to
          */
         public Builder(RuntimeContext runtimeContext, RuntimeAnnotatedExecutionTrace executionTrace,
-                Path basePath, ExecutionContext executionContext) {
+                Path basePath, Executor executor) {
             Objects.requireNonNull(runtimeContext);
             absoluteTrace = Objects.requireNonNull(executionTrace);
             this.basePath = Objects.requireNonNull(basePath);
-            this.executionContext = Objects.requireNonNull(executionContext);
+            this.executor = Objects.requireNonNull(executor);
             this.runtimeContext = Objects.requireNonNull(runtimeContext);
         }
 
@@ -463,7 +463,7 @@ public final class FileStagingArea extends ExternalStagingArea {
          * @return the new staging area
          */
         public FileStagingArea build() {
-            return new FileStagingArea(absoluteTrace, runtimeContext, executionContext, new Object(),
+            return new FileStagingArea(absoluteTrace, runtimeContext, executor, new Object(),
                 jaxbContext(), basePath, hardLinkEnabledPaths);
         }
     }

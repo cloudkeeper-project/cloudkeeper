@@ -97,7 +97,7 @@ public class CompositeModuleInterpreterActorTest {
     }
 
     private static ActorRef actor(ActorSystem actorSystem, ActorPath path) {
-        return await(actorSystem.actorSelection(path).resolveOne(ModuleInterpretation.DEFAULT_TIMEOUT));
+        return await(actorSystem.actorSelection(path).resolveOne(ModuleInterpretation.DEFAULT_DURATION));
     }
 
     private static Set<ExecutionTrace> tracesSet(String... traces) {
@@ -152,9 +152,9 @@ public class CompositeModuleInterpreterActorTest {
                 && beginExecutionTraceEvent.getTimestamp() <= System.currentTimeMillis());
             Assert.assertFalse(eventProbe.msgAvailable());
 
-            // Verify that the submodule interpreter has not yet been started (pending the check wether the out-port "r"
-            // already has a value). Then process events so that the ComputeResumeState algorithm finishes. Verify that
-            // the submodule interpreter has been started then.
+            // Verify that the submodule interpreter has not yet been started (pending the check whether the out-port
+            // "r" already has a value). Then process events so that the ComputeResumeState algorithm finishes. Verify
+            // that the submodule interpreter has been started then.
             CompositeModuleInterpreterActor actor = actorRef.underlyingActor();
             int dId = submodule(moduleInterpretation, "d").getIndex();
             Assert.assertNull(actor.getChildExecutor(dId));

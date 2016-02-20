@@ -1,8 +1,6 @@
 package xyz.cloudkeeper.contracts;
 
-import akka.dispatch.Futures;
 import org.testng.Assert;
-import scala.concurrent.Future;
 import xyz.cloudkeeper.dsl.Module;
 import xyz.cloudkeeper.dsl.ModuleFactory;
 import xyz.cloudkeeper.examples.repositories.TestKitExecutableProvider;
@@ -27,6 +25,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Internal helper class that factors out code needed both by {@link StagingAreaContract} and
@@ -126,10 +125,10 @@ final class StagingAreaContractHelper {
 
     private class RuntimeContextFactoryImpl implements RuntimeContextFactory {
         @Override
-        public Future<RuntimeContext> newRuntimeContext(List<URI> bundleIdentifiers) {
+        public CompletableFuture<RuntimeContext> newRuntimeContext(List<URI> bundleIdentifiers) {
             RuntimeBundle fibonacciBundle = repository.getBundles().get(0);
             if (Collections.singletonList(fibonacciBundle.getBundleIdentifier()).equals(bundleIdentifiers)) {
-                return Futures.successful(runtimeContext);
+                return CompletableFuture.completedFuture(runtimeContext);
             }
 
             Assert.fail(String.format(

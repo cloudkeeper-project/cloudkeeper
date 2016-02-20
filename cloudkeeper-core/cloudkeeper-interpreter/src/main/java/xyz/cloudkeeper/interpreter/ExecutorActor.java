@@ -3,14 +3,9 @@ package xyz.cloudkeeper.interpreter;
 import akka.actor.ActorRef;
 import akka.actor.Status.Failure;
 import akka.actor.UntypedActor;
-import akka.dispatch.Futures;
-import akka.dispatch.OnComplete;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
 import akka.japi.Creator;
-import scala.concurrent.Future;
-import scala.concurrent.Promise;
-import scala.util.Success;
 import xyz.cloudkeeper.model.api.ExecutionException;
 import xyz.cloudkeeper.model.api.RuntimeStateProvider;
 import xyz.cloudkeeper.model.api.executor.SimpleModuleExecutor;
@@ -25,12 +20,13 @@ import java.io.ObjectOutputStream;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 
 final class ExecutorActor extends UntypedActor {
     private final LoggingAdapter log = Logging.getLogger(getContext().system(), (UntypedActor) this);
     private final SimpleModuleExecutor simpleModuleExecutor;
 
-    private final Map<ActorRef, Promise<String>> activeTasks = new HashMap<>();
+    private final Map<ActorRef, CompletableFuture<SimpleModuleExecutorResult>> activeTasks = new HashMap<>();
 
     ExecutorActor(SimpleModuleExecutor simpleModuleExecutor) {
         Objects.requireNonNull(simpleModuleExecutor);
@@ -66,8 +62,7 @@ final class ExecutorActor extends UntypedActor {
     }
 
     /**
-     * Handles request to execute the simple module represented by the given
-     * {@link xyz.cloudkeeper.model.api.RuntimeStateProvider}.
+     * Handles request to execute the simple module represented by the given {@link RuntimeStateProvider}.
      *
      * <p>It is guaranteed that this method is called with non-null arguments.
      */
@@ -88,46 +83,40 @@ final class ExecutorActor extends UntypedActor {
         RuntimeStateProvider runtimeStateProvider = message.getRuntimeStateProvider();
         ExecutionTrace executionTrace = runtimeStateProvider.getExecutionTrace();
 
-        Promise<String> promise = Futures.promise();
-        activeTasks.put(sender, promise);
         log.debug(
             "[Execution ID {}] [Trace {}] Submitting to simple-module executor (of {}).",
             message.getExecutionId(), executionTrace, simpleModuleExecutor.getClass()
         );
-        Future<SimpleModuleExecutorResult> resultFuture = simpleModuleExecutor.submit(
-            runtimeStateProvider,
-            promise.future()
-        );
+        CompletableFuture<SimpleModuleExecutorResult> resultFuture = simpleModuleExecutor.submit(runtimeStateProvider);
+        activeTasks.put(sender, resultFuture);
 
         long executionId = message.getExecutionId();
-        resultFuture.onComplete(new OnComplete<SimpleModuleExecutorResult>() {
-            @Override
-            public void onComplete(@Nullable Throwable throwable, @Nullable SimpleModuleExecutorResult executorResult) {
-                assert (throwable == null) != (executorResult == null);
-
-                CompletionAction completionAction;
-                if (throwable != null) {
-                    completionAction = new FailureAction(sender, executionId, executionTrace, new Failure(
-                        new ExecutionException(String.format(
-                            "Unexpected exception returned by simple-module executor (of %s).",
-                            simpleModuleExecutor.getClass()
-                        ), throwable)
-                    ));
-                } else {
-                    completionAction = new ResultAction(sender, executionId, executionTrace, executorResult);
-                }
-
-                // The following is essentially an asynchronous call of CompletionAction#run(). Note that we must not
-                // call this method directly in order to avoid a race condition.
-                getSelf().tell(completionAction, getSelf());
+        resultFuture.whenComplete((executorResult, throwable) -> {
+            // executor contract: throwable == null || throwable instanceof ExecutionException
+            CompletionAction<?> completionAction;
+            if (throwable != null) {
+                completionAction = new FailureAction(sender, executionId, executionTrace, new Failure(
+                    new ExecutionException(String.format(
+                        "Unexpected exception returned by simple-module executor (of %s).",
+                        simpleModuleExecutor.getClass()
+                    ), throwable)
+                ));
+            } else {
+                completionAction = new ResultAction(sender, executionId, executionTrace, executorResult);
             }
-        }, getContext().dispatcher());
+
+            // The following is essentially an asynchronous call of CompletionAction#run(). Note that we must not
+            // call this method directly in order to avoid a race condition.
+            getSelf().tell(completionAction, getSelf());
+        });
     }
 
     void cancelExecution(ExecutorActorInterface.CancelExecution message) {
-        @Nullable Promise<String> promise = activeTasks.get(getSender());
-        if (promise != null) {
-            promise.tryComplete(new Success<>(message.getReason()));
+        @Nullable CompletableFuture<SimpleModuleExecutorResult> completableFuture = activeTasks.get(getSender());
+        if (completableFuture != null) {
+            // From the API doc: The argument has "no effect in this implementation because interrupts are not used to
+            // control processing"
+            completableFuture.cancel(true);
         } else {
             log.warning(String.format("Ignoring %s because sender %s is unknown.", message, getSender()));
         }
@@ -139,8 +128,8 @@ final class ExecutorActor extends UntypedActor {
             executeSimpleModule((ExecutorActorInterface.ExecuteTrace) message);
         } else if (message instanceof ExecutorActorInterface.CancelExecution) {
             cancelExecution((ExecutorActorInterface.CancelExecution) message);
-        } else if (message instanceof CompletionAction) {
-            ((CompletionAction) message).run();
+        } else if (message instanceof CompletionAction<?>) {
+            ((CompletionAction<?>) message).run();
         } else {
             unhandled(message);
         }
@@ -198,7 +187,7 @@ final class ExecutorActor extends UntypedActor {
         @Nullable
         @Override
         Throwable throwable(SimpleModuleExecutorResult message) {
-            return message.getExecutionException().getOrElse(null);
+            return message.getExecutionException();
         }
     }
 }

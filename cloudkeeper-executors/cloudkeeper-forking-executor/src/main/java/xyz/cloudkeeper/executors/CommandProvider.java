@@ -7,6 +7,7 @@ import java.util.List;
 /**
  * Provider of command lines in order to execute a simple-module executor process.
  */
+@FunctionalInterface
 public interface CommandProvider {
     /**
      * Returns the command that will be executed for the given execution trace.

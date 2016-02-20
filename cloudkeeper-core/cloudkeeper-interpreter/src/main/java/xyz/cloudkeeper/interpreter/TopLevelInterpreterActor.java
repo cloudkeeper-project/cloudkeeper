@@ -8,15 +8,12 @@ import akka.actor.Status;
 import akka.actor.SupervisorStrategy;
 import akka.actor.Terminated;
 import akka.actor.UntypedActor;
-import akka.dispatch.Futures;
-import akka.dispatch.Mapper;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
 import akka.japi.Creator;
 import akka.pattern.Patterns;
 import akka.util.Timeout;
-import scala.concurrent.ExecutionContext;
-import scala.concurrent.Future;
+import scala.concurrent.ExecutionContextExecutor;
 import scala.concurrent.duration.Duration;
 import xyz.cloudkeeper.interpreter.MasterInterpreterActorInterface.CreateExecution;
 import xyz.cloudkeeper.interpreter.event.FailedExecutionTraceEvent;
@@ -30,6 +27,7 @@ import xyz.cloudkeeper.model.immutable.execution.ExecutionTrace;
 import xyz.cloudkeeper.model.runtime.element.module.RuntimeInPort;
 import xyz.cloudkeeper.model.runtime.element.module.RuntimeModule;
 import xyz.cloudkeeper.model.runtime.element.module.RuntimeOutPort;
+import net.florianschoppmann.java.futures.Futures;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
@@ -41,6 +39,7 @@ import java.util.BitSet;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -56,7 +55,7 @@ final class TopLevelInterpreterActor extends AbstractActor {
     private final LoggingAdapter log = Logging.getLogger(getContext().system(), (UntypedActor) this);
 
     private final long executionId;
-    @Nullable private final ExecutionContext asyncTaskContext;
+    @Nullable private final ExecutionContextExecutor asyncTaskContext;
     private final CreateExecution parameters;
     private final ActorRef administrator;
     private final InterpreterEventBus eventBus;
@@ -104,21 +103,21 @@ final class TopLevelInterpreterActor extends AbstractActor {
      */
     static final class Factory implements Creator<UntypedActor> {
         private final long executionId;
-        @Nullable private final ExecutionContext asyncTaskContext;
+        @Nullable private final ExecutionContextExecutor asyncTaskContext;
         private final CreateExecution parameters;
 
         /**
          * Constructor.
          *
          * @param executionId id of this workflow execution
-         * @param asyncTaskContext The {@link ExecutionContext} that is to be used for scheduling asynchronous tasks
-         *     (such as futures), or {@code null} to indicate that {@code getContext().dispatcher()} should be used.
-         *     This should be non-null only if the actor is created within the current JVM. This parameter is
+         * @param asyncTaskContext The {@link ExecutionContextExecutor} that is to be used for scheduling asynchronous
+         *     tasks (such as futures), or {@code null} to indicate that {@code getContext().dispatcher()} should be
+         *     used. This should be non-null only if the actor is created within the current JVM. This parameter is
          *     <em>not</em> preserved during serialization.
          * @param parameters execution parameters stemming from
          *     {@link xyz.cloudkeeper.model.api.WorkflowExecutionBuilder}
          */
-        Factory(long executionId, @Nullable ExecutionContext asyncTaskContext, CreateExecution parameters) {
+        Factory(long executionId, @Nullable ExecutionContextExecutor asyncTaskContext, CreateExecution parameters) {
             this.executionId = executionId;
             this.asyncTaskContext = asyncTaskContext;
             this.parameters = Objects.requireNonNull(parameters);
@@ -227,7 +226,7 @@ final class TopLevelInterpreterActor extends AbstractActor {
      * Returns a future that will be completed with a {@link BitSet} that contains the indices of all in-ports that have
      * a value.
      */
-    private Future<BitSet> getInPortsWithValues() {
+    private CompletableFuture<BitSet> getInPortsWithValues() {
         final RuntimeModule child = stagingArea.getAnnotatedExecutionTrace().getModule();
         final List<? extends RuntimeInPort> inPorts = child.getInPorts();
         final List<ExecutionTrace> portValueTraces = inPorts.stream()
@@ -235,25 +234,20 @@ final class TopLevelInterpreterActor extends AbstractActor {
             .collect(Collectors.toList());
 
         return Futures
-            .traverse(portValueTraces, stagingArea::exists, getContext().dispatcher())
-            .map(
-                new Mapper<Iterable<Boolean>, BitSet>() {
-                    @Override
-                    public BitSet apply(Iterable<Boolean> hasValueIterable) {
-                        BitSet inPortsWithValue = new BitSet(inPorts.size());
-
-                        int inPortId = 0;
-                        for (boolean hasValue: hasValueIterable) {
-                            if (hasValue) {
-                                inPortsWithValue.set(inPortId);
-                            }
-                            ++inPortId;
-                        }
-                        return inPortsWithValue;
+            .collect(portValueTraces.stream()
+                .map(stagingArea::exists)
+                .collect(Collectors.toList())
+            ).thenApply(hasValueList -> {
+                BitSet inPortsWithValue = new BitSet(inPorts.size());
+                int inPortId = 0;
+                for (boolean hasValue: hasValueList) {
+                    if (hasValue) {
+                        inPortsWithValue.set(inPortId);
                     }
-                },
-                getContext().dispatcher()
-            );
+                    ++inPortId;
+                }
+                return inPortsWithValue;
+            });
     }
 
     private void run() {
@@ -282,31 +276,25 @@ final class TopLevelInterpreterActor extends AbstractActor {
 
         // It is OK to close over module, stagingArea, and outPortsRequiringValue, because they are effectively
         // immutable before the future is completed.
-        Future<Props> futureProps =
-            getInPortsWithValues()
-            .map(
-                new Mapper<BitSet, Props>() {
-                    @Override
-                    public Props checkedApply(BitSet inPortsWithValue) throws InterpreterException {
-                        int numInPorts = module.getInPorts().size();
-                        if (inPortsWithValue.length() != numInPorts || inPortsWithValue.cardinality() != numInPorts) {
-                            List<SimpleName> missingInPortNames = module.getInPorts().stream()
-                                .filter(inPort -> !inPortsWithValue.get(inPort.getInIndex()))
-                                .map(RuntimeInPort::getSimpleName)
-                                .collect(Collectors.toList());
-                            throw new InterpreterException(ExecutionTrace.empty(), String.format(
-                                "Values for in-ports %s are missing.", missingInPortNames
-                            ));
-                        }
+        CompletableFuture<Props> futureProps = Futures.thenApply(
+            getInPortsWithValues(),
+            inPortsWithValue -> {
+                int numInPorts = module.getInPorts().size();
+                if (inPortsWithValue.length() != numInPorts || inPortsWithValue.cardinality() != numInPorts) {
+                    List<SimpleName> missingInPortNames = module.getInPorts().stream()
+                        .filter(inPort -> !inPortsWithValue.get(inPort.getInIndex()))
+                        .map(RuntimeInPort::getSimpleName)
+                        .collect(Collectors.toList());
+                    throw new InterpreterException(ExecutionTrace.empty(), String.format(
+                        "Values for in-ports %s are missing.", missingInPortNames
+                    ));
+                }
 
-                        return parameters.getInterpreterPropsProvider()
-                            .provideInterpreterProps(interpreterProperties, stagingArea,
-                                0, Collections.nCopies(numInPorts, DependencyGraph.HasValue.HAS_VALUE),
-                                parameters.getUpdatedInPorts(), outPortsRequiringValue);
-                    }
-                },
-                getContext().dispatcher()
-            );
+                return parameters.getInterpreterPropsProvider()
+                    .provideInterpreterProps(interpreterProperties, stagingArea,
+                        0, Collections.nCopies(numInPorts, DependencyGraph.HasValue.HAS_VALUE),
+                        parameters.getUpdatedInPorts(), outPortsRequiringValue);
+            });
         pipeResultToSelf(futureProps, "checking in-ports with values");
     }
 
@@ -335,7 +323,7 @@ final class TopLevelInterpreterActor extends AbstractActor {
 
         if (this.instanceProvider == null) {
             this.instanceProvider = instanceProvider;
-            Future<RuntimeContext> runtimeStateFuture
+            CompletableFuture<RuntimeContext> runtimeStateFuture
                 = parameters.getRuntimeStateProvider().provideRuntimeContext(instanceProvider);
             pipeResultToSelf(runtimeStateFuture, "reconstructing runtime context");
         } else {
@@ -346,11 +334,11 @@ final class TopLevelInterpreterActor extends AbstractActor {
     @Override
     public void preStart() {
         String instanceProviderActorPath = parameters.getInstanceProviderActorPath();
-        Future<Object> instanceProviderFuture = Patterns.ask(
+        CompletableFuture<Object> instanceProviderFuture = ScalaFutures.completableFutureOf(Patterns.ask(
             getContext().actorSelection(instanceProviderActorPath),
             InstanceProviderActorInterface.GetInstanceProviderMessage.INSTANCE,
             new Timeout(1, TimeUnit.SECONDS)
-        );
+        ), getAsyncTaskContext());
         pipeResultToSelf(instanceProviderFuture, "asking actor at '%s' for '%s'", instanceProviderActorPath,
             InstanceProvider.class.getSimpleName());
     }

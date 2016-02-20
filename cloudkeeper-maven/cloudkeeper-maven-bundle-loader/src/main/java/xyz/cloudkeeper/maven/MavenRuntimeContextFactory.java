@@ -1,7 +1,5 @@
 package xyz.cloudkeeper.maven;
 
-import akka.dispatch.Futures;
-import akka.dispatch.Mapper;
 import org.eclipse.aether.RepositorySystem;
 import org.eclipse.aether.RepositorySystemSession;
 import org.eclipse.aether.artifact.Artifact;
@@ -11,8 +9,6 @@ import org.eclipse.aether.repository.RemoteRepository;
 import org.eclipse.aether.util.artifact.JavaScopes;
 import org.eclipse.aether.util.filter.AndDependencyFilter;
 import org.eclipse.aether.util.filter.ScopeDependencyFilter;
-import scala.concurrent.ExecutionContext;
-import scala.concurrent.Future;
 import xyz.cloudkeeper.linker.ClassProvider;
 import xyz.cloudkeeper.linker.ExecutableProvider;
 import xyz.cloudkeeper.linker.Linker;
@@ -21,7 +17,6 @@ import xyz.cloudkeeper.model.LinkerException;
 import xyz.cloudkeeper.model.api.RuntimeContext;
 import xyz.cloudkeeper.model.api.RuntimeContextFactory;
 import xyz.cloudkeeper.model.api.RuntimeStateProvisionException;
-import xyz.cloudkeeper.model.api.util.ScalaFutures;
 import xyz.cloudkeeper.model.bare.element.module.BareModule;
 import xyz.cloudkeeper.model.bare.execution.BareExecutionTrace;
 import xyz.cloudkeeper.model.bare.execution.BareOverride;
@@ -30,6 +25,7 @@ import xyz.cloudkeeper.model.immutable.element.Name;
 import xyz.cloudkeeper.model.runtime.element.RuntimeRepository;
 import xyz.cloudkeeper.model.runtime.execution.RuntimeAnnotatedExecutionTrace;
 import xyz.cloudkeeper.model.util.BuildInformation;
+import net.florianschoppmann.java.futures.Futures;
 import xyz.cloudkeeper.model.util.ImmutableList;
 
 import javax.annotation.Nullable;
@@ -48,6 +44,9 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.Executor;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -79,7 +78,7 @@ public abstract class MavenRuntimeContextFactory implements RuntimeContextFactor
      * @see <a href="https://jaxb.java.net/guide/Performance_and_thread_safety.html">https://jaxb.java.net/guide/Performance_and_thread_safety.html</a>
      */
     private final JAXBContext jaxbContext;
-    private final ExecutionContext executionContext;
+    private final Executor executor;
     private final AetherConnector aetherConnector;
     private final Function<ClassLoader, ClassProvider> classProviderProvider;
     private final Function<ClassLoader, ExecutableProvider> executableProviderProvider;
@@ -88,7 +87,7 @@ public abstract class MavenRuntimeContextFactory implements RuntimeContextFactor
      * This class is used to create Maven bundle loaders.
      */
     public static final class Builder {
-        private final ExecutionContext executionContext;
+        private final Executor executor;
         private final RepositorySystem repositorySystem;
         private final RepositorySystemSession repositorySystemSession;
         private ImmutableList<RemoteRepository> remoteRepositories = ImmutableList.of();
@@ -102,15 +101,15 @@ public abstract class MavenRuntimeContextFactory implements RuntimeContextFactor
         /**
          * Constructs a new builder.
          *
-         * @param executionContext execution context for running asynchronous tasks during the loading process
+         * @param executor executor for running asynchronous tasks during the loading process
          * @param repositorySystem Eclipse Aether repository system. This instance will be used, possibly concurrently,
          *     for all bundle-loading tasks.
          * @param repositorySystemSession Eclipse Aether session that provides settings and components that control the
          *     repository system ({@link RepositorySystemSession} instances are supposed to be immutable).
          */
-        public Builder(ExecutionContext executionContext, RepositorySystem repositorySystem,
+        public Builder(Executor executor, RepositorySystem repositorySystem,
                 RepositorySystemSession repositorySystemSession) {
-            this.executionContext = Objects.requireNonNull(executionContext);
+            this.executor = Objects.requireNonNull(executor);
             this.repositorySystem = Objects.requireNonNull(repositorySystem);
             this.repositorySystemSession = Objects.requireNonNull(repositorySystemSession);
         }
@@ -233,7 +232,7 @@ public abstract class MavenRuntimeContextFactory implements RuntimeContextFactor
             ), exception);
         }
 
-        executionContext = builder.executionContext;
+        executor = builder.executor;
         aetherConnector = new AetherConnector(
             builder.repositorySystem, builder.repositorySystemSession, builder.remoteRepositories);
         classProviderProvider = builder.classProviderProvider;
@@ -288,11 +287,11 @@ public abstract class MavenRuntimeContextFactory implements RuntimeContextFactor
      * ({@code <dependencyManagement>} sections in a Maven POM file).
      */
     @Override
-    public Future<RuntimeContext> newRuntimeContext(List<URI> bundleIdentifiers) {
+    public CompletableFuture<RuntimeContext> newRuntimeContext(List<URI> bundleIdentifiers) {
         Objects.requireNonNull(bundleIdentifiers);
         final ImmutableList<URI> localBundleIdentifiers = ImmutableList.copyOf(bundleIdentifiers);
 
-        return Futures.future(() -> {
+        CompletionStage<RuntimeContext> completionStage = Futures.supplyAsync(() -> {
             List<Artifact> unresolvedArtifacts = localBundleIdentifiers
                 .stream()
                 .flatMap(this::artifactStreamFromURI)
@@ -316,8 +315,13 @@ public abstract class MavenRuntimeContextFactory implements RuntimeContextFactor
             }
 
             return runtimeContext(bundleArtifacts, bundles);
-        }, executionContext)
-        .transform(ScalaFutures.identityMapper(), new ExceptionMapper(localBundleIdentifiers), executionContext);
+        }, executor);
+        return Futures.translateException(
+            completionStage,
+            throwable -> new RuntimeStateProvisionException(String.format(
+                "Failed to provide runtime state for bundles %s.", bundleIdentifiers
+            ), Futures.unwrapCompletionException(throwable))
+        );
     }
 
     private abstract static class AbstractRuntimeContext implements RuntimeContext {
@@ -456,23 +460,6 @@ public abstract class MavenRuntimeContextFactory implements RuntimeContextFactor
             LinkerOptions linkerOptions = linkerOptions(classLoader);
             RuntimeRepository repository = Linker.createRepository(bundles, linkerOptions);
             return new NonExecutableRuntimeContext(repository, linkerOptions);
-        }
-    }
-
-    private static final class ExceptionMapper extends Mapper<Throwable, Throwable> {
-        private final ImmutableList<URI> bundleIdentifiers;
-
-        private ExceptionMapper(List<URI> bundleIdentifiers) {
-            this.bundleIdentifiers = ImmutableList.copyOf(bundleIdentifiers);
-        }
-
-        @Override
-        public Throwable apply(@Nullable Throwable parameter) {
-            assert parameter != null : "Violation of precondition.";
-            return parameter instanceof Exception
-                ? new RuntimeStateProvisionException(
-                    String.format("Failed to provide runtime state for bundles %s.", bundleIdentifiers), parameter)
-                : parameter;
         }
     }
 }

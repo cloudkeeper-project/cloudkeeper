@@ -1,29 +1,26 @@
 package xyz.cloudkeeper.interpreter;
 
 import akka.actor.UntypedActor;
-import akka.dispatch.OnComplete;
-import akka.dispatch.OnFailure;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
-import akka.japi.Option;
-import scala.concurrent.Future;
-import scala.concurrent.Promise;
 import xyz.cloudkeeper.interpreter.AdministratorActorInterface.ManageExecution;
 import xyz.cloudkeeper.interpreter.AdministratorActorInterface.OutPortAvailable;
 import xyz.cloudkeeper.model.api.RuntimeContext;
 import xyz.cloudkeeper.model.api.WorkflowExecutionException;
 import xyz.cloudkeeper.model.api.staging.StagingArea;
-import xyz.cloudkeeper.model.api.util.ScalaFutures;
 import xyz.cloudkeeper.model.immutable.execution.ExecutionTrace;
 import xyz.cloudkeeper.model.runtime.element.module.RuntimeModule;
 import xyz.cloudkeeper.model.runtime.element.module.RuntimeOutPort;
 import xyz.cloudkeeper.model.runtime.execution.RuntimeExecutionTrace;
 
+import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.NavigableMap;
+import java.util.Optional;
 import java.util.TreeMap;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Administrator actor.
@@ -94,7 +91,7 @@ final class AdministratorActor extends UntypedActor {
         long executionId = message.getExecutionId();
         int outPortId = message.getOutPortId();
 
-        ManagedExecution execution = executions.get(executionId);
+        @Nullable ManagedExecution execution = executions.get(executionId);
         if (execution != null) {
             StagingArea stagingArea = execution.request.getStagingArea();
             RuntimeModule module = stagingArea.getAnnotatedExecutionTrace().getModule();
@@ -105,21 +102,23 @@ final class AdministratorActor extends UntypedActor {
             if (outPortId >= 0 && outPortId < outPorts.size()) {
                 if (execution.outPortStatusList.get(outPortId) == OutPortStatus.UNAVAILABLE) {
                     RuntimeOutPort outPort = outPorts.get(outPortId);
-                    Promise<Object> promise = execution.request.getOutPortPromises().get(outPortId);
+                    CompletableFuture<Object> promise = execution.request.getOutPortPromises().get(outPortId);
                     if (execution.request.isRetrieveResults()) {
                         execution.outPortStatusList.set(outPortId, OutPortStatus.STAGING_AREA);
-                        Future<Object> future
+                        CompletableFuture<Object> future
                             = stagingArea.getObject(ExecutionTrace.empty().resolveOutPort(outPort.getSimpleName()));
-                        future.onComplete(new OnComplete<Object>() {
-                            @Override
-                            public void onComplete(Throwable throwable, Object object) {
-                                getSelf().tell(new GotValueForOutPort(execution, outPort), getSelf());
+                        future.whenComplete((object, failure) -> {
+                            // staging-area contract: failure == null || failure instanceof StagingException
+                            if (failure != null) {
+                                promise.completeExceptionally(failure);
+                            } else {
+                                promise.complete(object);
                             }
-                        }, getContext().dispatcher());
-                        promise.completeWith(future);
+                            getSelf().tell(new GotValueForOutPort(execution, outPort), getSelf());
+                        });
                     } else {
                         execution.outPortStatusList.set(outPortId, OutPortStatus.DONE);
-                        promise.failure(new WorkflowExecutionException(
+                        promise.completeExceptionally(new WorkflowExecutionException(
                             "Workflow execution configured to not provide out-port values."
                         ));
                     }
@@ -139,20 +138,20 @@ final class AdministratorActor extends UntypedActor {
 
     private void executionFinished(AdministratorActorInterface.ExecutionFinished message) {
         long executionId = message.getExecutionId();
-        WorkflowExecutionException exception = message.getException();
+        @Nullable WorkflowExecutionException exception = message.getException();
 
-        ManagedExecution execution = executions.get(executionId);
+        @Nullable ManagedExecution execution = executions.get(executionId);
         if (execution != null) {
-            execution.request.getFinishTimeMillisPromise().success(System.currentTimeMillis());
-            execution.request.getExecutionExceptionPromise().success(
+            execution.request.getFinishTimeMillisPromise().complete(System.currentTimeMillis());
+            execution.request.getExecutionExceptionPromise().complete(
                 exception != null
-                    ? Option.some(exception)
-                    : Option.<WorkflowExecutionException>none()
+                    ? Optional.of(exception)
+                    : Optional.empty()
             );
 
             List<RuntimeOutPort> uncompletedOutPorts = new ArrayList<>();
             int outPortId = 0;
-            for (Promise<Object> promise: execution.request.getOutPortPromises()) {
+            for (CompletableFuture<Object> promise: execution.request.getOutPortPromises()) {
                 // Note that the following check does not introduce a race. We are inside an actor, which processes
                 // only one message at a time. At the end of this method, the execution is removed, so the promise is
                 // guaranteed to be never touched again by us.
@@ -168,7 +167,7 @@ final class AdministratorActor extends UntypedActor {
                             "Workflow execution finished before %s received value.", outPort
                         ));
                     }
-                    promise.failure(outPortException);
+                    promise.completeExceptionally(outPortException);
                 }
                 ++outPortId;
             }
@@ -191,18 +190,13 @@ final class AdministratorActor extends UntypedActor {
         if (outPortStatusList.stream().filter(status -> status != OutPortStatus.DONE).count() == 0) {
             RuntimeContext runtimeContext = managedExecution.request.getRuntimeContext();
             // Shield this actor from exceptions that RuntimeContext#close() may throw
-            ScalaFutures
-                .supplySync(() -> {
-                    runtimeContext.close();
-                    return Boolean.TRUE;
-                })
-                .onFailure(new OnFailure() {
-                    @Override
-                    public void onFailure(Throwable throwable) {
-                        log.error(throwable, "Failed to close runtime context for execution id {}.",
-                            managedExecution.request.getExecutionId());
-                    }
-                }, getContext().dispatcher());
+            try {
+                runtimeContext.close();
+            } catch (Exception exception) {
+                // We need a fault barrier with a catch-all here, because closing the runtime context may run user code.
+                log.error(exception, "Failed to close runtime context for execution id {}.",
+                    managedExecution.request.getExecutionId());
+            }
         }
     }
 

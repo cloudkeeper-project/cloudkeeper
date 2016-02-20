@@ -1,9 +1,7 @@
 package xyz.cloudkeeper.simple;
 
-import akka.dispatch.Mapper;
-import akka.dispatch.Recover;
-import scala.concurrent.ExecutionContext;
-import scala.concurrent.Future;
+import net.florianschoppmann.java.futures.Futures;
+import xyz.cloudkeeper.model.LinkerException;
 import xyz.cloudkeeper.model.api.Executable;
 import xyz.cloudkeeper.model.api.ExecutionException;
 import xyz.cloudkeeper.model.api.RuntimeContext;
@@ -13,9 +11,9 @@ import xyz.cloudkeeper.model.api.executor.ModuleConnectorProvider;
 import xyz.cloudkeeper.model.api.executor.SimpleModuleExecutor;
 import xyz.cloudkeeper.model.api.executor.SimpleModuleExecutorResult;
 import xyz.cloudkeeper.model.api.staging.InstanceProvider;
+import xyz.cloudkeeper.model.api.staging.InstanceProvisionException;
 import xyz.cloudkeeper.model.api.staging.StagingArea;
 import xyz.cloudkeeper.model.api.staging.StagingAreaProvider;
-import xyz.cloudkeeper.model.api.util.ScalaFutures;
 import xyz.cloudkeeper.model.immutable.element.Name;
 import xyz.cloudkeeper.model.immutable.element.SimpleName;
 import xyz.cloudkeeper.model.runtime.element.module.RuntimeProxyModule;
@@ -24,6 +22,9 @@ import xyz.cloudkeeper.model.runtime.execution.RuntimeAnnotatedExecutionTrace;
 
 import javax.annotation.Nullable;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.Executor;
 
 public final class LocalSimpleModuleExecutor implements SimpleModuleExecutor {
     /**
@@ -50,13 +51,13 @@ public final class LocalSimpleModuleExecutor implements SimpleModuleExecutor {
      */
     public static final SimpleName PROCESSING_FINISH_TIME_MILLIS = SimpleName.identifier("processingFinishTimeMillis");
 
-    private final ExecutionContext executionContext;
+    private final Executor executor;
     private final InstanceProvider instanceProvider;
     private final ModuleConnectorProvider moduleConnectorProvider;
 
-    private LocalSimpleModuleExecutor(ExecutionContext executionContext,
-            ModuleConnectorProvider moduleConnectorProvider, InstanceProvider instanceProvider) {
-        this.executionContext = executionContext;
+    private LocalSimpleModuleExecutor(Executor executor, ModuleConnectorProvider moduleConnectorProvider,
+            InstanceProvider instanceProvider) {
+        this.executor = executor;
         this.instanceProvider = instanceProvider;
         this.moduleConnectorProvider = moduleConnectorProvider;
     }
@@ -68,7 +69,7 @@ public final class LocalSimpleModuleExecutor implements SimpleModuleExecutor {
      * is passed.
      */
     public static class Builder {
-        private final ExecutionContext executionContext;
+        private final Executor executor;
         private final ModuleConnectorProvider moduleConnectorProvider;
         @Nullable private InstanceProvider instanceProvider;
 
@@ -81,14 +82,14 @@ public final class LocalSimpleModuleExecutor implements SimpleModuleExecutor {
          * a different execution context. Otherwise, a deadlock could occur when one task is waiting for the result of
          * another task, which however cannot be scheduled because the maximum thread-pool size is reached.
          *
-         * @param executionContext the execution context that will be used for executing module (as well as internal
+         * @param executor the execution context that will be used for executing module (as well as internal
          *     tasks created to complete internal futures)
          * @param moduleConnectorProvider the module-connector provider whose
          *     {@link ModuleConnectorProvider#provideModuleConnector(StagingArea)} method will be called in
          *     order to build a {@link ExtendedModuleConnector} instance around a staging area
          */
-        public Builder(ExecutionContext executionContext, ModuleConnectorProvider moduleConnectorProvider) {
-            this.executionContext = Objects.requireNonNull(executionContext);
+        public Builder(Executor executor, ModuleConnectorProvider moduleConnectorProvider) {
+            this.executor = Objects.requireNonNull(executor);
             this.moduleConnectorProvider = Objects.requireNonNull(moduleConnectorProvider);
         }
 
@@ -97,11 +98,11 @@ public final class LocalSimpleModuleExecutor implements SimpleModuleExecutor {
          *
          * <p>The instance provider will be passed to
          * {@link StagingAreaProvider#provideStaging(RuntimeContext, RuntimeAnnotatedExecutionTrace, InstanceProvider)},
-         * which will be called from {@link #submit(RuntimeStateProvider, Future)}.
+         * which will be called from {@link #submit(RuntimeStateProvider)}.
          *
          * <p>By default, if this method is not called, the instance provider will be a new
          * {@link SimpleInstanceProvider} that provides the execution context passed to
-         * {@link #Builder(ExecutionContext, ModuleConnectorProvider)} and a new
+         * {@link #Builder(Executor, ModuleConnectorProvider)} and a new
          * {@link DSLRuntimeContextFactory} (which itself also uses the same execution context).
          *
          * @param instanceProvider the instance provider, may be {@code null} to set to the default
@@ -115,9 +116,9 @@ public final class LocalSimpleModuleExecutor implements SimpleModuleExecutor {
         public LocalSimpleModuleExecutor build() {
             @Nullable InstanceProvider actualInstanceProvider = instanceProvider;
             if (actualInstanceProvider == null) {
-                actualInstanceProvider = new SimpleInstanceProvider.Builder(executionContext).build();
+                actualInstanceProvider = new SimpleInstanceProvider.Builder(executor).build();
             }
-            return new LocalSimpleModuleExecutor(executionContext, moduleConnectorProvider, actualInstanceProvider);
+            return new LocalSimpleModuleExecutor(executor, moduleConnectorProvider, actualInstanceProvider);
         }
     }
 
@@ -133,48 +134,52 @@ public final class LocalSimpleModuleExecutor implements SimpleModuleExecutor {
         private volatile long processingFinishTimeMillis = 0;
     }
 
+    private static Void runExecutable(IntermediateResults intermediateResults, Executable executable,
+            ExtendedModuleConnector moduleConnector) throws ExecutionException {
+        try {
+            intermediateResults.processingStartTimeMillis = System.currentTimeMillis();
+            executable.run(moduleConnector);
+        } finally {
+            intermediateResults.processingFinishTimeMillis = System.currentTimeMillis();
+        }
+        return null;
+    }
+
+    private CompletionStage<Void> createModuleConnectorAndRun(RuntimeStateProvider runtimeStateProvider,
+            RuntimeContext runtimeContext, IntermediateResults intermediateResults)
+            throws LinkerException, InstanceProvisionException {
+        StagingArea stagingArea;
+        stagingArea = runtimeStateProvider.provideStagingArea(runtimeContext, instanceProvider);
+        return Futures.thenComposeWithResource(
+            moduleConnectorProvider.provideModuleConnector(stagingArea),
+            moduleConnector -> {
+                RuntimeProxyModule simpleModule = (RuntimeProxyModule) moduleConnector.getExecutionTrace().getModule();
+                Executable executable = ((RuntimeSimpleModuleDeclaration) simpleModule.getDeclaration()).toExecutable();
+                return Futures
+                    .supplyAsync(() -> runExecutable(intermediateResults, executable, moduleConnector), executor)
+                    .thenCompose(ignore -> moduleConnector.commit());
+            }
+        );
+    }
+
     /**
      * @return Future representing pending completion of the task. If the simple module is executed successfully, the
      *     future will be completed with a {@link SimpleModuleExecutorResult}, otherwise with an
      *     {@link ExecutionException} (unless the {@link Throwable} is not an exception).
      */
     @Override
-    public Future<SimpleModuleExecutorResult> submit(RuntimeStateProvider runtimeStateProvider,
-            @Nullable Future<String> cancellationFuture) {
+    public CompletableFuture<SimpleModuleExecutorResult> submit(RuntimeStateProvider runtimeStateProvider) {
         IntermediateResults intermediateResults = new IntermediateResults();
-        return runtimeStateProvider
-            .flatMapRuntimeContext(
-                instanceProvider,
-                runtimeContext -> {
-                    StagingArea stagingArea = runtimeStateProvider.provideStagingArea(runtimeContext, instanceProvider);
-                    return ScalaFutures
-                        .flatMapWithResource(
-                            moduleConnectorProvider.provideModuleConnector(stagingArea),
-                            moduleConnector -> {
-                                RuntimeProxyModule simpleModule
-                                    = (RuntimeProxyModule) moduleConnector.getExecutionTrace().getModule();
-                                Executable executable
-                                    = ((RuntimeSimpleModuleDeclaration) simpleModule.getDeclaration()).toExecutable();
-                                try {
-                                    intermediateResults.processingStartTimeMillis = System.currentTimeMillis();
-                                    executable.run(moduleConnector);
-                                } finally {
-                                    intermediateResults.processingFinishTimeMillis = System.currentTimeMillis();
-                                }
-                                return moduleConnector.commit();
-                            },
-                            executionContext
-                        );
-                },
-                executionContext
-            )
-            .map(new Mapper<Object, SimpleModuleExecutorResult>() {
-                @Override
-                public SimpleModuleExecutorResult apply(Object ignored) {
-                    return resultBuilder(intermediateResults).build();
-                }
-            }, executionContext)
-            .recover(new RecoverWithTiming(intermediateResults, runtimeStateProvider), executionContext);
+        CompletableFuture<Void> runModuleStage = Futures.thenComposeWithResource(
+            runtimeStateProvider.provideRuntimeContext(instanceProvider),
+            runtimeContext -> createModuleConnectorAndRun(runtimeStateProvider, runtimeContext, intermediateResults)
+        );
+        CompletableFuture<SimpleModuleExecutorResult> buildResultStage
+            = runModuleStage.thenApply(ignored -> resultBuilder(intermediateResults).build());
+        return buildResultStage.exceptionally(
+            throwable
+                -> failedResult(intermediateResults, runtimeStateProvider, Futures.unwrapCompletionException(throwable))
+        );
     }
 
     private static SimpleModuleExecutorResult.Builder resultBuilder(IntermediateResults intermediateResults) {
@@ -193,25 +198,15 @@ public final class LocalSimpleModuleExecutor implements SimpleModuleExecutor {
         return resultBuilder;
     }
 
-    private static final class RecoverWithTiming extends Recover<SimpleModuleExecutorResult> {
-        private final IntermediateResults intermediateResults;
-        private final RuntimeStateProvider runtimeStateProvider;
-
-        private RecoverWithTiming(IntermediateResults intermediateResults, RuntimeStateProvider runtimeStateProvider) {
-            this.intermediateResults = intermediateResults;
-            this.runtimeStateProvider = runtimeStateProvider;
-        }
-
-        @Override
-        public SimpleModuleExecutorResult recover(Throwable throwable) {
-            ExecutionException exception = throwable instanceof ExecutionException
-                ? (ExecutionException) throwable
-                : new ExecutionException(String.format(
-                    "Simple-module execution failed for execution trace '%s'.", runtimeStateProvider.getExecutionTrace()
-                ), throwable);
-            return resultBuilder(intermediateResults)
-                .setException(exception)
-                .build();
-        }
+    private static SimpleModuleExecutorResult failedResult(IntermediateResults intermediateResults,
+            RuntimeStateProvider runtimeStateProvider, Throwable throwable) {
+        ExecutionException exception = throwable instanceof ExecutionException
+            ? (ExecutionException) throwable
+            : new ExecutionException(String.format(
+                "Simple-module execution failed for execution trace '%s'.", runtimeStateProvider.getExecutionTrace()
+            ), throwable);
+        return resultBuilder(intermediateResults)
+            .setException(exception)
+            .build();
     }
 }
