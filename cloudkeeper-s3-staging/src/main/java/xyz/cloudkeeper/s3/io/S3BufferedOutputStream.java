@@ -4,9 +4,9 @@ import com.amazonaws.services.s3.model.CompleteMultipartUploadResult;
 import com.amazonaws.services.s3.model.InitiateMultipartUploadResult;
 import com.amazonaws.services.s3.model.PartETag;
 import com.amazonaws.services.s3.model.UploadPartResult;
+import net.florianschoppmann.java.futures.Futures;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import xyz.cloudkeeper.model.util.Futures;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
@@ -340,7 +340,7 @@ final class S3BufferedOutputStream extends OutputStream {
 
         // Now partETagFutures contains all partETagFutures
         CompletableFuture<CompleteMultipartUploadResult> completionFuture = Futures
-            .shortCircuitCollect(partETagFutures, executorService)
+            .shortCircuitCollect(partETagFutures)
             .thenComposeAsync(
                 partETags -> s3Connection.completeMultipartUpload(bucketName, key, uploadId, partETags),
                 executorService

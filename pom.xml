@@ -95,6 +95,7 @@
         <apache.commons.compress>1.7</apache.commons.compress>
 
         <types.version>1.0.1</types.version>
+        <futures.version>1.0.0</futures.version>
     </properties>
 
     <dependencyManagement>
@@ -208,6 +209,11 @@
                 <artifactId>java-types</artifactId>
                 <type>test-jar</type>
                 <version>${types.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>net.florianschoppmann.java</groupId>
+                <artifactId>java-futures</artifactId>
+                <version>${futures.version}</version>
             </dependency>
 
             <dependency>
