@@ -110,6 +110,17 @@
                 <groupId>xyz.cloudkeeper.core</groupId>
                 <artifactId>cloudkeeper-asm-repackaged-5.0</artifactId>
                 <version>${project.version}</version>
+                <!-- The dependency of asm-repackaged on org.ow2.asm:asm exists only prior to the Maven Shade plugin, which
+                     attaches a "dependency-reduced" POM. However, the Maven reactor may run before the Shade plugin, so we
+                     need to add the exclusion here. (At the time of this writing, this Maven bug has been observed when the
+                     entire CloudKeeper project was added as a submodule to some other project, but not when just building
+                     the CloudKeeper project by itself.) -->
+                <exclusions>
+                    <exclusion>
+                        <groupId>org.ow2.asm</groupId>
+                        <artifactId>asm</artifactId>
+                    </exclusion>
+                </exclusions>
             </dependency>
             <dependency>
                 <groupId>xyz.cloudkeeper.core</groupId>
