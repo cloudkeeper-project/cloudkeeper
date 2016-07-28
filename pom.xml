@@ -77,20 +77,26 @@
         <!-- The following version is taken from: https://github.com/apache/maven/blob/maven-3.1.0/pom.xml#L61 -->
         <aether.in.plugins.version>0.9.0.M2</aether.in.plugins.version>
 
-        <aws.sdk.version>1.8.9</aws.sdk.version>
-
         <slf4j.version>1.7.13</slf4j.version>
         <testng.version>6.8.21</testng.version>
         <mockito.version>1.10.19</mockito.version>
         <junit.version>4.11</junit.version>
         <jacoco.version>0.7.5.201505241946</jacoco.version>
-        <!-- Note that aether-transport-http relies on the Apache HTTP client, so imported versions should be
-             compatible. -->
+
+        <!-- Note that just like Aether below, AWS also depends on httpclient 4.3. -->
+        <aws.sdk.version>1.10.77</aws.sdk.version>
+
+        <!-- Aether and transitive dependencies -->
         <aether.version>1.0.2.v20150114</aether.version>
-        <maven.version>3.2.5</maven.version>
-        <!-- The following version is taken from: https://github.com/apache/maven/blob/maven-3.2.5/pom.xml#L52 -->
-        <plexus.utils.version>3.0.20</plexus.utils.version>
-        <!-- The following version is taken from: https://github.com/apache/maven/blob/maven-3.2.5/pom.xml#L54 -->
+        <!-- We version-manage httpclient because not only aether-transport-http depends on it. Obviously, all our
+             dependencies should be compatible with this httpclient version. While Aether still depends on 4.2, this
+             commit suggests that 4.3 works just fine:
+             https://github.com/eclipse/aether-core/commit/80334ca56c2f7063cef400fff70a54d8591ab52e -->
+        <apache.httpclient.version>4.3.6</apache.httpclient.version>
+        <maven.version>3.3.9</maven.version>
+        <!-- The following version is taken from: https://github.com/apache/maven/blob/maven-3.3.9/pom.xml#L54 -->
+        <plexus.utils.version>3.0.22</plexus.utils.version>
+        <!-- The following version is taken from: https://github.com/apache/maven/blob/maven-3.3.9/pom.xml#L56 -->
         <guava.version>18.0</guava.version>
         <apache.commons.compress>1.7</apache.commons.compress>
 
@@ -332,18 +338,18 @@
                 <groupId>org.apache.maven</groupId>
                 <artifactId>maven-aether-provider</artifactId>
                 <!-- Note that this version must only be used when embedding Aether. For plugins, version
-                     ${maven.version} must be used! -->
+                     ${maven.in.plugins.version} must be used! -->
                 <version>${maven.version}</version>
             </dependency>
             <dependency>
                 <!-- The following is necessary when using maven-aether-provider, because its POM is quite messy. It
-                     depends optionally on org.sonatype.sisu:sisu:guice:no_aop:3.2.3 (see
-                     https://github.com/apache/maven/blob/maven-3.2.5/maven-aether-provider/pom.xml#L83), which brings
-                     in guava (see https://github.com/sonatype/sisu-guice/blob/sisu-guice-3.2.3/pom.xml#L130).
+                     depends optionally on com.google.inject:guice:no_aop:4.0 (see
+                     https://github.com/apache/maven/blob/maven-3.3.9/maven-aether-provider/pom.xml#L77), which brings
+                     in guava (see https://github.com/google/guice/blob/4.0/pom.xml#L144).
                      Unfortunately, the transitive guava dependency is not really optional:
                      org.apache.maven.repository.internal.DefaultModelResolver imports com.google.common.base.Predicate.
                      Also note that guava is version controlled in the Maven base POM:
-                     https://github.com/apache/maven/blob/maven-3.2.5/pom.xml#L53. -->
+                     https://github.com/apache/maven/blob/maven-3.3.9/pom.xml#L56. -->
                 <groupId>com.google.guava</groupId>
                 <artifactId>guava</artifactId>
                 <version>${guava.version}</version>
@@ -359,8 +365,19 @@
 
             <dependency>
                 <groupId>com.amazonaws</groupId>
-                <artifactId>aws-java-sdk</artifactId>
+                <artifactId>aws-java-sdk-core</artifactId>
                 <version>${aws.sdk.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.amazonaws</groupId>
+                <artifactId>aws-java-sdk-s3</artifactId>
+                <version>${aws.sdk.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.apache.httpcomponents</groupId>
+                <artifactId>httpclient</artifactId>
+                <version>${apache.httpclient.version}</version>
             </dependency>
 
             <!-- Aether for dynamically resolving Maven/Aether dependencies at runtime -->
